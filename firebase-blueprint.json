@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with authentication and workspace info",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Paper": {
+      "title": "Paper",
+      "description": "Academic research paper ingested by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "authors": { "type": "array" },
+        "publicationDate": { "type": "string" },
+        "venueOrCategory": { "type": "string" },
+        "doi": { "type": "string" },
+        "arxivId": { "type": "string" },
+        "abstract": { "type": "string" },
+        "totalPages": { "type": "number" },
+        "summary": { "type": "object" },
+        "ingestionSource": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Interactive RAG chat message associated with a paper",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "paperId": { "type": "string" },
+        "sender": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "userId", "paperId", "sender", "text"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profile"
+    },
+    "/users/{userId}/papers/{paperId}": {
+      "schema": "Paper",
+      "description": "Papers saved in the user's private workspace"
+    },
+    "/users/{userId}/papers/{paperId}/chats/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat messages and Q&A history for a specific paper"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "uid": "user_8f79b439148bba02",
+    "email": "test.researcher@mit.edu",
+    "passwordHash": "2fd0ce7606ce52c433894ec4d7ba72281bc53f4032c6eba3305601f29c5ad10b",
+    "salt": "eaba1f86c5834d8b2b0f2e212e59ffba",
+    "displayName": "Dr. Test",
+    "createdAt": "2026-10-10T16:52:00.275Z",
+    "lastLogin": "2026-10-10T16:52:12.246Z"
+  },
+  {
+    "uid": "user_1b8437e4d34742d5",
+    "email": "kaveblue5@gmail.com",
+    "passwordHash": "34369ed9db928ef5ad2d60b8b6e63cf73480379229836a09a921d394b39edead",
+    "salt": "50b01bb69bc588ceb2d9d8557af23a06",
+    "displayName": "K P",
+    "createdAt": "2026-10-12T06:56:51.683Z",
+    "lastLogin": "2026-10-12T07:39:45.495Z"
+  }
+]

@@ -1,0 +1,296 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 2251
+>>
+stream
+0.200025 w
+0 G
+BT
+/F2 8 Tf
+9.1999999999999993 TL
+0.31 0.275 0.898 rg
+45. 796.8899999999999864 Td
+(SCHOLARPULSE AI  ·  AUTHENTIC RESEARCH MANUSCRIPT) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.059 0.09 0.165 rg
+45. 780.8899999999999864 Td
+(LoRA: Low-Rank Adaptation of Large Language Models) Tj
+ET
+BT
+/F1 8.5 Tf
+9.7749999999999986 TL
+0.392 0.455 0.545 rg
+45. 756.8899999999999864 Td
+(Authors: Edward J. Hu · Yelong Shen · Phillip Wallis · Zeyuan Allen-Zhu · Yuanzhi Li · Shean Wang · Lu Wang · Weizhu Chen  |  Venue:) Tj
+T* (ICLR 2022 \(cs.CL\)  |  Published: 2021) Tj
+ET
+0.89 0.91 0.94 RG
+1. w
+45. 722.8899999999999864 m
+550.2799999999999727 722.8899999999999864 l
+S
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.263 0.22 0.792 rg
+45. 706.8899999999999864 Td
+(Abstract) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+45. 690.8899999999999864 Td
+(An important paradigm of natural language processing consists of large-scale pre-training on general domain data and) Tj
+T* (adaptation to particular tasks. As we pre-train larger models, full fine-tuning, which retrains all model parameters, becomes less) Tj
+T* (feasible. We propose Low-Rank Adaptation, or LoRA, which freezes the pre-trained model weights and injects trainable rank) Tj
+T* (decomposition matrices into each layer of the Transformer architecture, greatly reducing the number of trainable parameters for) Tj
+T* (downstream tasks.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.263 0.22 0.792 rg
+45. 612.8899999999999864 Td
+(4 Method) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.2 0.255 0.333 rg
+45. 596.8899999999999864 Td
+(A neural network contains many dense layers which perform matrix multiplication. The weight matrices in these layers typically) Tj
+T* (have full-rank. When adapting to a specific task, Aghajanyan et al. \(2020\) shows that the pre-trained language models have a) Tj
+T* (low "intrinsic dimension". Inspired by this, we hypothesize the updates to the weights also have a low "intrinsic rank" during) Tj
+T* (adaptation. For a pre-trained weight matrix W0 in R^\(d x k\), we constrain its update by representing the latter with a low-rank) Tj
+T* (decomposition W0 + Delta W = W0 + BA, where B in R^\(d x r\), A in R^\(r x k\), and the rank r << min\(d, k\).) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R ]
+/Count 1
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+6 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+/F4 8 0 R
+/F5 9 0 R
+/F6 10 0 R
+/F7 11 0 R
+/F8 12 0 R
+/F9 13 0 R
+/F10 14 0 R
+/F11 15 0 R
+/F12 16 0 R
+/F13 17 0 R
+/F14 18 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+19 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20261012122708-00'00')
+>>
+endobj
+20 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000002455 00000 n 
+0000004272 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000002512 00000 n 
+0000002637 00000 n 
+0000002767 00000 n 
+0000002900 00000 n 
+0000003037 00000 n 
+0000003160 00000 n 
+0000003289 00000 n 
+0000003421 00000 n 
+0000003557 00000 n 
+0000003685 00000 n 
+0000003812 00000 n 
+0000003941 00000 n 
+0000004074 00000 n 
+0000004176 00000 n 
+0000004520 00000 n 
+0000004606 00000 n 
+trailer
+<<
+/Size 21
+/Root 20 0 R
+/Info 19 0 R
+/ID [ <AEBA32FB446F82A0EB355ADD9A5AFB57> <AEBA32FB446F82A0EB355ADD9A5AFB57> ]
+>>
+startxref
+4710
+%%EOF

@@ -1,0 +1,6 @@
+{
+  "name": "ScholarPulse AI - Research Paper Summarizer & RAG Insight Platform",
+  "description": "Production-grade research paper ingestion, structure-aware extraction, map-reduce summarization, and interactive RAG Q&A with real-time arXiv & PDF analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,36 @@
+# Python Backend Requirements for ScholarPulse AI
+# Production-ready research paper RAG & Summarizer platform
+
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.7.4
+python-multipart==0.0.9
+requests==2.32.3
+aiohttp==3.9.5
+
+# PDF and Document Parsing
+pymupdf==1.24.4            # Structure-aware PyMuPDF (fitz)
+pdfplumber==0.11.0          # Fallback table & layout extraction
+beautifulsoup4==4.12.3      # XML/GROBID TEI extraction
+lxml==5.2.2                 # High-speed XML parser
+
+# LangChain Orchestration & Text Splitting
+langchain==0.2.6
+langchain-core==0.2.11
+langchain-community==0.2.6
+langchain-text-splitters==0.2.2
+langchain-google-genai==1.0.7
+
+# Embeddings & Vector Indexing
+sentence-transformers==3.0.1  # Local dense embeddings (e.g., bge-small, MiniLM)
+faiss-cpu==1.8.0              # High-performance vector similarity search
+numpy==1.26.4
+scikit-learn==1.5.0
+
+# LLM SDK (Google Gemini)
+google-genai==0.1.1
+
+# Database & Workspace Persistence
+sqlalchemy==2.0.31
+aiosqlite==0.20.0
+psycopg2-binary==2.9.9        # Optional PostgreSQL driver for production
