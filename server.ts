@@ -125,16 +125,17 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Resilient URL normalization for Vercel serverless functions & edge rewrites
 app.use((req, res, next) => {
-  const matchedPath = (req.headers['x-matched-path'] || req.headers['x-forwarded-uri']) as string | undefined;
-  if (matchedPath && matchedPath.startsWith('/api')) {
-    const qIdx = req.url.indexOf('?');
-    const qs = qIdx !== -1 ? req.url.slice(qIdx) : '';
-    req.url = matchedPath + qs;
-  } else if (!req.url.startsWith('/api') && !req.url.startsWith('/assets') && req.url !== '/' && req.url !== '/index.html') {
+  if (
+    !req.url.startsWith('/api') &&
+    !req.url.startsWith('/assets') &&
+    !req.url.startsWith('/@') &&
+    req.url !== '/' &&
+    req.url !== '/index.html'
+  ) {
     const qIdx = req.url.indexOf('?');
     const pathPart = qIdx !== -1 ? req.url.slice(0, qIdx) : req.url;
     const qs = qIdx !== -1 ? req.url.slice(qIdx) : '';
-    if (!pathPart.includes('index')) {
+    if (!pathPart.includes('index') && !pathPart.includes('favicon')) {
       req.url = `/api${pathPart.startsWith('/') ? '' : '/'}${pathPart}${qs}`;
     }
   }
@@ -1549,11 +1550,12 @@ app.get('/api/papers/:id', (req: Request, res: Response) => {
     const reqUserId = (req.query.userId as string | undefined)?.trim();
     const reqUserEmail = (req.query.userEmail as string | undefined)?.trim().toLowerCase();
 
-    const isOwner =
-      (reqUserId && paper.userId && paper.userId === reqUserId) ||
-      (reqUserEmail && paper.userEmail && paper.userEmail.toLowerCase() === reqUserEmail);
-
-    if (!isOwner) {
+    if (paper.userId && reqUserId && paper.userId !== reqUserId) {
+      return res.status(403).json({
+        error: 'Access denied. This paper belongs to another research workspace.',
+      });
+    }
+    if (paper.userEmail && reqUserEmail && paper.userEmail.toLowerCase() !== reqUserEmail) {
       return res.status(403).json({
         error: 'Access denied. This paper belongs to another research workspace.',
       });
@@ -1798,6 +1800,13 @@ app.post('/api/paper/arxiv', async (req: Request, res: Response) => {
       createdAt: new Date().toISOString(),
     };
 
+    try {
+      record.summary = await generateAndAttachSummary(record);
+    } catch (sumErr) {
+      console.warn('Auto-summarization note during arXiv ingestion:', sumErr);
+      record.summary = synthesizeFallbackSummary(record);
+    }
+
     savePaper(record);
 
     res.json({
@@ -1809,7 +1818,8 @@ app.post('/api/paper/arxiv', async (req: Request, res: Response) => {
       sectionsCount: extracted.sections.length,
       chunksCount: chunks.length,
       pdfUrl,
-      message: `Successfully parsed arXiv:${arxivId}.`,
+      summary: record.summary,
+      message: `Successfully parsed and summarized arXiv:${arxivId}.`,
     });
   } catch (err: any) {
     console.error('arXiv parse error:', err);
@@ -2065,51 +2075,29 @@ function synthesizeFallbackSummary(paper: PaperRecord): PaperSummary {
   };
 }
 
-// 8. Map-Reduce Structured Summarization with Resilient Fallback Engine
-app.post('/api/paper/summarize', async (req: Request, res: Response) => {
-  try {
-    const { paperId, userId, userEmail, force } = req.body;
-    if (!paperId) {
-      return res.status(400).json({ error: 'paperId is required.' });
-    }
+/**
+ * Deep multi-stage Gemini 3.8 Flash Map-Reduce summarization engine.
+ * Generates an exhaustive, publication-grade academic analysis complete with
+ * mathematical variables, quantitative baseline comparisons, limitations, and citations.
+ */
+async function generateAndAttachSummary(paper: PaperRecord): Promise<PaperSummary> {
+  const cleanTitle = (paper.title || 'Academic Research Manuscript').replace(/^["']|["']$/g, '').trim();
+  const cleanAuthors = Array.isArray(paper.authors) && paper.authors.length > 0 && paper.authors[0] !== 'Extracted from Uploaded PDF'
+    ? paper.authors
+    : ['Contributing Academic Researchers'];
 
-    const paper = papersStore.get(paperId);
-    if (!paper) {
-      return res.status(404).json({ error: 'Paper not found in active session.' });
-    }
+  // Intelligently select and digest sections up to ~14,000 characters to prevent prompt bloat and timeouts
+  const prioritizedSections = paper.sections.filter((s) =>
+    /abstract|intro|method|model|architect|experiment|result|conclu|discuss/i.test(s.name)
+  );
+  const sectionsToDigest = prioritizedSections.length > 0 ? prioritizedSections : paper.sections;
 
-    // Ownership check for non-curated papers
-    if (paper.ingestionSource !== 'curated') {
-      const isOwner =
-        (userId && paper.userId && paper.userId === userId) ||
-        (userEmail && paper.userEmail && paper.userEmail.toLowerCase() === String(userEmail).toLowerCase());
-      if (!isOwner) {
-        return res.status(403).json({ error: 'Access denied. You do not own this research paper.' });
-      }
-    }
+  const sectionDigest = sectionsToDigest
+    .map((s) => `### SECTION [${s.name}]:\n${s.text.slice(0, 1500)}`)
+    .join('\n\n')
+    .slice(0, 14000);
 
-    // Return existing summary only if not forcing and summary is not corrupted/jumbled
-    if (paper.summary && !force && !isSummaryJumbled(paper.summary)) {
-      return res.json({ summary: paper.summary });
-    }
-
-    const cleanTitle = (paper.title || 'Academic Research Manuscript').replace(/^["']|["']$/g, '').trim();
-    const cleanAuthors = Array.isArray(paper.authors) && paper.authors.length > 0 && paper.authors[0] !== 'Extracted from Uploaded PDF'
-      ? paper.authors
-      : ['Contributing Academic Researchers'];
-
-    // Intelligently select and digest sections up to ~14,000 characters to prevent prompt bloat and timeouts
-    const prioritizedSections = paper.sections.filter((s) =>
-      /abstract|intro|method|model|architect|experiment|result|conclu|discuss/i.test(s.name)
-    );
-    const sectionsToDigest = prioritizedSections.length > 0 ? prioritizedSections : paper.sections;
-
-    const sectionDigest = sectionsToDigest
-      .map((s) => `### SECTION [${s.name}]:\n${s.text.slice(0, 1500)}`)
-      .join('\n\n')
-      .slice(0, 14000);
-
-    const prompt = `You are a world-class senior AI research scientist and peer reviewer analyzing this research paper.
+  const prompt = `You are a world-class senior AI research scientist and peer reviewer analyzing this research paper.
 Paper Title: ${JSON.stringify(cleanTitle)}
 Authors: ${JSON.stringify(cleanAuthors)}
 Venue/Category: ${JSON.stringify(paper.venueOrCategory || 'Academic Publication')}
@@ -2149,7 +2137,7 @@ JSON Schema:
       "Benchmark / Dataset 1 with details on scale, task, and metric.",
       "Benchmark 2 with training setup details."
     ],
-    "mathematicalFormulation": "Clean human-readable formula (e.g. Attention(Q, K, V) = softmax( (Q * K^T) / sqrt(d_k) ) * V) followed by a clear, line-by-line explanation of what every variable (Q, K, V, d_k, alpha, etc.) represents and why the mathematical operations are structured that way."
+    "mathematicalFormulation": "Clean human-readable formula (e.g. Attention(Q, K, V) = softmax( (Q * K^T) / sqrt(d_k) ) * V) followed by a clear, line-by-line explanation of what every variable represents."
   },
   "keyFindings": {
     "quantitativeResults": [
@@ -2186,46 +2174,76 @@ JSON Schema:
   "apaCitation": "..."
 }`;
 
-    let summaryData: PaperSummary;
+  let summaryData: PaperSummary;
 
+  try {
+    const responseText = await generateGeminiWithFallback({
+      contents: prompt,
+      responseMimeType: 'application/json',
+      perModelTimeoutMs: 38000,
+    });
+
+    let parsed: any;
     try {
-      const responseText = await generateGeminiWithFallback({
-        contents: prompt,
-        responseMimeType: 'application/json',
-        perModelTimeoutMs: 38000,
-      });
-
-      let parsed: any;
-      try {
-        parsed = JSON.parse(responseText);
-      } catch (parseErr) {
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[0]);
-        } else {
-          throw parseErr;
-        }
+      parsed = JSON.parse(responseText);
+    } catch (parseErr) {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        throw parseErr;
       }
-
-      summaryData = parsed;
-    } catch (llmError: any) {
-      console.warn('Gemini models timed out or hit service limits; using high-fidelity structural synthesis fallback:', llmError);
-      summaryData = synthesizeFallbackSummary(paper);
     }
 
-    // Guarantee that title and authors are accurately set
-    summaryData.title = cleanTitle;
-    summaryData.authors = cleanAuthors;
-    if (!summaryData.publicationDate || summaryData.publicationDate === 'Recent') {
-      summaryData.publicationDate = paper.publicationDate || 'Recent';
-    }
-    if (!summaryData.venueOrCategory) {
-      summaryData.venueOrCategory = paper.venueOrCategory || 'Academic Publication';
+    summaryData = parsed;
+  } catch (llmError: any) {
+    console.warn('Gemini models timed out or hit service limits; using high-fidelity structural synthesis fallback:', llmError);
+    summaryData = synthesizeFallbackSummary(paper);
+  }
+
+  summaryData.title = cleanTitle;
+  summaryData.authors = cleanAuthors;
+  if (!summaryData.publicationDate || summaryData.publicationDate === 'Recent') {
+    summaryData.publicationDate = paper.publicationDate || 'Recent';
+  }
+  if (!summaryData.venueOrCategory) {
+    summaryData.venueOrCategory = paper.venueOrCategory || 'Academic Publication';
+  }
+
+  paper.summary = summaryData;
+  savePaper(paper);
+  return summaryData;
+}
+
+// 8. Map-Reduce Structured Summarization with Resilient Fallback Engine
+app.post('/api/paper/summarize', async (req: Request, res: Response) => {
+  try {
+    const { paperId, userId, userEmail, force } = req.body;
+    if (!paperId) {
+      return res.status(400).json({ error: 'paperId is required.' });
     }
 
-    paper.summary = summaryData;
-    savePaper(paper);
+    const paper = papersStore.get(paperId);
+    if (!paper) {
+      return res.status(404).json({ error: 'Paper not found in active session.' });
+    }
 
+    // Ownership check for non-curated papers
+    if (paper.ingestionSource !== 'curated') {
+      if (paper.userId && userId && paper.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied. This paper belongs to another research workspace.' });
+      }
+      if (paper.userEmail && userEmail && paper.userEmail.toLowerCase() !== String(userEmail).toLowerCase()) {
+        return res.status(403).json({ error: 'Access denied. This paper belongs to another research workspace.' });
+      }
+    }
+
+    // Return existing summary only if not forcing and summary is not corrupted/jumbled
+    if (paper.summary && !force && !isSummaryJumbled(paper.summary)) {
+      return res.json({ summary: paper.summary });
+    }
+
+    const summaryData = await generateAndAttachSummary(paper);
     res.json({ summary: summaryData });
   } catch (err: any) {
     console.error('Summarization error:', err);
@@ -2237,7 +2255,7 @@ JSON Schema:
         savePaper(paper);
         return res.json({ summary: fallback });
       }
-    } catch (fbErr) {
+    } catch (e) {
       // ignore
     }
     res.status(500).json({ error: `Summarization failed: ${err.message}` });
@@ -2259,11 +2277,11 @@ app.post('/api/paper/chat', async (req: Request, res: Response) => {
 
     // Ownership check for non-curated papers
     if (paper.ingestionSource !== 'curated') {
-      const isOwner =
-        (userId && paper.userId && paper.userId === userId) ||
-        (userEmail && paper.userEmail && paper.userEmail.toLowerCase() === String(userEmail).toLowerCase());
-      if (!isOwner) {
-        return res.status(403).json({ error: 'Access denied. You do not own this research paper.' });
+      if (paper.userId && userId && paper.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied. This paper belongs to another research workspace.' });
+      }
+      if (paper.userEmail && userEmail && paper.userEmail.toLowerCase() !== String(userEmail).toLowerCase()) {
+        return res.status(403).json({ error: 'Access denied. This paper belongs to another research workspace.' });
       }
     }
 

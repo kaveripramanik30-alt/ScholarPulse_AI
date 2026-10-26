@@ -195,173 +195,21 @@ export async function ingestArxivPaper(
   }
 
   // 1. Try server endpoint
-  try {
-    const res = await safeFetchJson<{ paperId: string; title: string; error?: string }>('/api/paper/arxiv', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        input: cleanInput,
-        userId: currentUser?.uid,
-        userEmail: currentUser?.email,
-      }),
-    });
+  const res = await safeFetchJson<{ paperId: string; title: string; summary?: any; error?: string }>('/api/paper/arxiv', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      input: cleanInput,
+      userId: currentUser?.uid,
+      userEmail: currentUser?.email,
+    }),
+  });
 
-    if (res.ok && res.data?.paperId) {
-      return { success: true, paperId: res.data.paperId, title: res.data.title || 'Academic Paper' };
-    }
-  } catch (e) {
-    console.warn('Server arXiv ingestion notice:', e);
+  if (res.ok && res.data?.paperId) {
+    return { success: true, paperId: res.data.paperId, title: res.data.title || 'Academic Paper' };
   }
 
-  // 2. Resilient Client-Side arXiv Fallback Engine
-  return await clientSideArxivIngest(arxivId, currentUser);
-}
-
-/**
- * Client-Side arXiv Fallback Engine:
- * Queries arXiv API or builds structured paper metadata directly in browser
- */
-async function clientSideArxivIngest(
-  arxivId: string,
-  currentUser: User | null
-): Promise<{ success: boolean; paperId: string; title: string }> {
-  let title = `arXiv:${arxivId} Research Paper`;
-  let authors = ['Contributing Researchers'];
-  let abstract = 'Academic manuscript ingested from arXiv Open Access repository.';
-  let pubDate = new Date().getFullYear().toString();
-
-  try {
-    // Query arXiv export API
-    const res = await fetch(`https://export.arxiv.org/api/query?id_list=${arxivId}`);
-    if (res.ok) {
-      const xml = await res.text();
-      const titleMatch = xml.match(/<title>([^<]+)<\/title>/gi);
-      if (titleMatch && titleMatch.length > 1) {
-        title = titleMatch[1].replace(/<\/?title>/gi, '').trim().replace(/\s+/g, ' ');
-      }
-      const authorMatches = Array.from(xml.matchAll(/<author>\s*<name>([^<]+)<\/name>/gi)).map((m) => m[1].trim());
-      if (authorMatches.length > 0) {
-        authors = authorMatches;
-      }
-      const summaryMatch = xml.match(/<summary>([^<]+)<\/summary>/i);
-      if (summaryMatch) {
-        abstract = summaryMatch[1].trim().replace(/\s+/g, ' ');
-      }
-      const publishedMatch = xml.match(/<published>([0-9]{4})/i);
-      if (publishedMatch) {
-        pubDate = publishedMatch[1];
-      }
-    }
-  } catch (err) {
-    console.warn('Direct arXiv XML query note, constructing structured record:', err);
-  }
-
-  const paperId = `paper_arxiv_${arxivId.replace(/[^a-zA-Z0-9]/g, '_')}`;
-  const sections: PaperSection[] = [
-    {
-      id: 'sec_1',
-      name: 'Abstract',
-      heading: 'Abstract',
-      text: abstract,
-      pageStart: 1,
-      pageEnd: 1,
-      charCount: abstract.length,
-    },
-    {
-      id: 'sec_2',
-      name: 'Introduction',
-      heading: '1 Introduction',
-      text: `${title} presents empirical analysis and methodologies addressing core problems in its respective field. In this work, the authors outline foundational problem formulations, theoretical guarantees, and quantitative benchmarks.`,
-      pageStart: 1,
-      pageEnd: 3,
-      charCount: 280,
-    },
-    {
-      id: 'sec_3',
-      name: 'Methodology',
-      heading: '2 Methodology & System Design',
-      text: `The proposed architecture formulates optimization objectives and algorithmic pipelines designed to maximize accuracy, throughput, and generalization across target benchmarks.`,
-      pageStart: 3,
-      pageEnd: 6,
-      charCount: 240,
-    },
-  ];
-
-  const chunks: PaperChunk[] = sections.map((sec, i) => ({
-    id: `chunk_${i + 1}`,
-    sectionName: sec.name,
-    heading: sec.heading,
-    pageNumber: sec.pageStart,
-    text: sec.text,
-    charCount: sec.charCount,
-    tokenEstimate: Math.round(sec.charCount / 4),
-  }));
-
-  const summary: PaperSummary = {
-    title,
-    authors,
-    publicationDate: pubDate,
-    venueOrCategory: `arXiv:${arxivId}`,
-    executiveSummary: abstract,
-    coreContributions: [
-      `Formalizes novel architectural formulations and empirical benchmarks for ${title}.`,
-      'Demonstrates measurable improvements in operational efficiency and quantitative metrics.',
-    ],
-    methodology: {
-      architecture: 'Structure-aware neural or algorithmic pipeline evaluated on standard empirical baselines.',
-      keyTechniques: ['Empirical benchmarking', 'Algorithmic optimization', 'Comparative baseline validation'],
-      benchmarksUsed: ['Open-access academic benchmarks'],
-      mathematicalFormulation: 'L = \\sum_{i} \\mathcal{L}(y_i, \\hat{y}_i)',
-    },
-    keyFindings: {
-      quantitativeResults: ['Demonstrates consistent performance gains over existing baseline methods.'],
-      qualitativeInsights: ['Analysis confirms improved stability and generalization under standard evaluation protocols.'],
-    },
-    limitations: ['Computational resources and evaluation scope bounded by open-access domain constraints.'],
-    practicalImplications: ['Applicable across academic research and applied engineering pipelines.'],
-    keyEquationsOrTheorems: [
-      {
-        label: 'Objective Formulation',
-        formulaOrDescription: '\\mathcal{L}_{total} = \\lambda_1 \\mathcal{L}_{task} + \\lambda_2 \\mathcal{R}(\\theta)',
-      },
-    ],
-    criticalEvaluation: {
-      strengths: ['Rigorous empirical validation', 'Clear experimental setup'],
-      weaknesses: ['Hyperparameter sensitivity across non-standard datasets'],
-      potentialBiases: ['Evaluated predominantly on benchmark distributions'],
-    },
-    bibtexCitation: `@article{arxiv_${arxivId.replace(/[^a-zA-Z0-9]/g, '_')},
-  title={${title}},
-  author={${authors.join(' and ')}},
-  journal={arXiv preprint arXiv:${arxivId}},
-  year={${pubDate}}
-}`,
-    apaCitation: `${authors.slice(0, 3).join(', ')}${authors.length > 3 ? ', et al.' : ''} (${pubDate}). ${title}. arXiv preprint arXiv:${arxivId}.`,
-  };
-
-  const newPaper: PaperDetail = {
-    id: paperId,
-    userId: currentUser?.uid,
-    title,
-    authors,
-    publicationDate: pubDate,
-    venueOrCategory: `arXiv:${arxivId}`,
-    arxivId,
-    abstract,
-    totalPages: 10,
-    sections,
-    chunks,
-    summary,
-    sectionCount: sections.length,
-    chunkCount: chunks.length,
-    hasSummary: true,
-    ingestionSource: 'arxiv',
-    createdAt: new Date().toISOString(),
-    pdfUrl: `https://arxiv.org/pdf/${arxivId}.pdf`,
-  };
-
-  saveLocalPaper(newPaper);
-  return { success: true, paperId: newPaper.id, title: newPaper.title };
+  throw new Error(res.data?.error || res.errorText || 'Failed to ingest and parse arXiv paper. Please verify the arXiv ID or URL.');
 }
 
 /**
@@ -373,88 +221,21 @@ export async function ingestDoiPaper(
 ): Promise<{ success: boolean; paperId: string; title: string }> {
   const cleanDoi = doi.trim().replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '');
 
-  try {
-    const res = await safeFetchJson<{ paperId: string; title: string; error?: string }>('/api/paper/doi', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        doi: cleanDoi,
-        userId: currentUser?.uid,
-        userEmail: currentUser?.email,
-      }),
-    });
+  const res = await safeFetchJson<{ paperId: string; title: string; error?: string }>('/api/paper/doi', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      doi: cleanDoi,
+      userId: currentUser?.uid,
+      userEmail: currentUser?.email,
+    }),
+  });
 
-    if (res.ok && res.data?.paperId) {
-      return { success: true, paperId: res.data.paperId, title: res.data.title || 'Academic Paper' };
-    }
-  } catch (e) {
-    console.warn('Server DOI ingestion notice:', e);
+  if (res.ok && res.data?.paperId) {
+    return { success: true, paperId: res.data.paperId, title: res.data.title || 'Academic Paper' };
   }
 
-  // CrossRef Fallback
-  let title = `DOI:${cleanDoi}`;
-  let authors = ['Contributing Authors'];
-  let pubDate = new Date().getFullYear().toString();
-
-  try {
-    const crossRefRes = await fetch(`https://api.crossref.org/works/${cleanDoi}`);
-    if (crossRefRes.ok) {
-      const crData = await crossRefRes.json();
-      const item = crData.message;
-      if (item.title && item.title.length > 0) title = item.title[0];
-      if (item.author && Array.isArray(item.author)) {
-        authors = item.author.map((a: any) => `${a.given || ''} ${a.family || ''}`.trim()).filter(Boolean);
-      }
-      if (item.issued?.['date-parts']?.[0]?.[0]) {
-        pubDate = item.issued['date-parts'][0][0].toString();
-      }
-    }
-  } catch (err) {
-    console.warn('CrossRef fetch note:', err);
-  }
-
-  const paperId = `paper_doi_${cleanDoi.replace(/[^a-zA-Z0-9]/g, '_')}`;
-  const sections: PaperSection[] = [
-    {
-      id: 'sec_1',
-      name: 'Abstract',
-      heading: 'Abstract',
-      text: `Academic paper indexed with DOI ${cleanDoi}. Investigates research methodologies, mathematical models, and empirical outcomes.`,
-      pageStart: 1,
-      pageEnd: 1,
-      charCount: 220,
-    },
-  ];
-
-  const newPaper: PaperDetail = {
-    id: paperId,
-    userId: currentUser?.uid,
-    title,
-    authors: authors.length > 0 ? authors : ['Contributing Authors'],
-    publicationDate: pubDate,
-    venueOrCategory: `DOI: ${cleanDoi}`,
-    doi: cleanDoi,
-    abstract: sections[0].text,
-    totalPages: 8,
-    sections,
-    chunks: sections.map((s, i) => ({
-      id: `chunk_${i + 1}`,
-      sectionName: s.name,
-      heading: s.heading,
-      pageNumber: 1,
-      text: s.text,
-      charCount: s.charCount,
-      tokenEstimate: 50,
-    })),
-    sectionCount: sections.length,
-    chunkCount: 1,
-    hasSummary: false,
-    ingestionSource: 'doi',
-    createdAt: new Date().toISOString(),
-  };
-
-  saveLocalPaper(newPaper);
-  return { success: true, paperId: newPaper.id, title: newPaper.title };
+  throw new Error(res.data?.error || res.errorText || `Failed to resolve DOI: ${cleanDoi}`);
 }
 
 /**
@@ -464,85 +245,30 @@ export async function ingestPdfFile(
   file: File,
   currentUser: User | null
 ): Promise<{ success: boolean; paperId: string; title: string }> {
-  // 1. Try server upload
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (currentUser?.uid) formData.append('userId', currentUser.uid);
-    if (currentUser?.email) formData.append('userEmail', currentUser.email);
+  const formData = new FormData();
+  formData.append('file', file);
+  if (currentUser?.uid) formData.append('userId', currentUser.uid);
+  if (currentUser?.email) formData.append('userEmail', currentUser.email);
 
-    const res = await fetch('/api/paper/upload', {
-      method: 'POST',
-      body: formData,
-    });
+  const res = await fetch('/api/paper/upload', {
+    method: 'POST',
+    body: formData,
+  });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data.paperId) {
-        return { success: true, paperId: data.paperId, title: data.title || file.name };
-      }
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const data = await res.json();
+    if (res.ok && data.paperId) {
+      return { success: true, paperId: data.paperId, title: data.title || file.name };
     }
-  } catch (e) {
-    console.warn('Server PDF upload notice, executing client-side extraction:', e);
+    throw new Error(data.error || 'Failed to parse uploaded PDF manuscript.');
   }
 
-  // 2. Client-side extraction fallback
-  const cleanTitle = file.name.replace(/\.pdf$/i, '').replace(/[_-]/g, ' ');
-  const paperId = `paper_pdf_${Date.now()}`;
-
-  const sections: PaperSection[] = [
-    {
-      id: 'sec_1',
-      name: 'Abstract',
-      heading: 'Abstract',
-      text: `Document uploaded: ${file.name} (${Math.round(file.size / 1024)} KB). Extracted and indexed for grounded RAG synthesis.`,
-      pageStart: 1,
-      pageEnd: 1,
-      charCount: 200,
-    },
-    {
-      id: 'sec_2',
-      name: 'Content & Extraction',
-      heading: '1 Manuscript Content',
-      text: `Uploaded manuscript indexed for interactive questions, section exploration, and grounded citations.`,
-      pageStart: 1,
-      pageEnd: 4,
-      charCount: 180,
-    },
-  ];
-
-  const newPaper: PaperDetail = {
-    id: paperId,
-    userId: currentUser?.uid,
-    title: cleanTitle,
-    authors: [currentUser?.displayName || 'Contributing Author'],
-    publicationDate: new Date().getFullYear().toString(),
-    venueOrCategory: 'Uploaded Manuscript',
-    abstract: sections[0].text,
-    totalPages: Math.max(1, Math.round(file.size / 45000)),
-    sections,
-    chunks: sections.map((s, i) => ({
-      id: `chunk_${i + 1}`,
-      sectionName: s.name,
-      heading: s.heading,
-      pageNumber: 1,
-      text: s.text,
-      charCount: s.charCount,
-      tokenEstimate: 50,
-    })),
-    sectionCount: sections.length,
-    chunkCount: sections.length,
-    hasSummary: false,
-    ingestionSource: 'upload',
-    createdAt: new Date().toISOString(),
-  };
-
-  saveLocalPaper(newPaper);
-  return { success: true, paperId: newPaper.id, title: newPaper.title };
+  throw new Error('Server returned unexpected response during PDF extraction.');
 }
 
 /**
- * Ask question in RAG Chat: queries server first, with grounded fallback based on paper chunks
+ * Ask question in RAG Chat: queries server's Gemini 3.8 Flash model with grounded evidence citations
  */
 export async function askPaperQuestion(
   paperId: string,
@@ -550,58 +276,27 @@ export async function askPaperQuestion(
   paper: PaperDetail,
   currentUser: User | null
 ): Promise<{ answer: string; citations: any[] }> {
-  try {
-    const res = await safeFetchJson<{ answer: string; citations?: any[]; error?: string }>('/api/paper/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        paperId,
-        question,
-        userId: currentUser?.uid,
-        userEmail: currentUser?.email,
-      }),
-    });
-
-    if (res.ok && res.data?.answer) {
-      return {
-        answer: res.data.answer,
-        citations: res.data.citations || [],
-      };
-    }
-  } catch (e) {
-    console.warn('Server chat query notice, synthesizing grounded response:', e);
-  }
-
-  // Grounded Chunk Retrieval Fallback
-  const qTerms = question.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
-  const scoredChunks = (paper.chunks || []).map((chunk: PaperChunk) => {
-    let score = 0;
-    const lowerText = chunk.text.toLowerCase();
-    for (const term of qTerms) {
-      if (lowerText.includes(term)) score += 1;
-    }
-    return { chunk, score };
+  const res = await safeFetchJson<{ answer: string; citations?: any[]; error?: string }>('/api/paper/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      paperId,
+      question,
+      userId: currentUser?.uid,
+      userEmail: currentUser?.email,
+    }),
   });
 
-  scoredChunks.sort((a: { chunk: PaperChunk; score: number }, b: { chunk: PaperChunk; score: number }) => b.score - a.score);
-  const topChunks = scoredChunks.slice(0, 3).filter((sc: { chunk: PaperChunk; score: number }) => sc.score > 0);
+  if (res.ok && res.data?.answer) {
+    return {
+      answer: res.data.answer,
+      citations: res.data.citations || [],
+    };
+  }
 
-  const citations = topChunks.map((tc: { chunk: PaperChunk; score: number }, idx: number) => ({
-    evidenceId: idx + 1,
-    section: tc.chunk.sectionName,
-    heading: tc.chunk.heading,
-    page: tc.chunk.pageNumber,
-    snippet: tc.chunk.text.slice(0, 220) + '...',
-    relevanceScore: Math.min(0.95, 0.6 + tc.score * 0.1),
-  }));
+  if (res.data?.error) {
+    throw new Error(res.data.error);
+  }
 
-  const answer = `Based on the indexed manuscript for **"${paper.title}"**:
-
-${topChunks.length > 0 ? topChunks[0].chunk.text : paper.abstract}
-
-**Key Grounded Insight:**
-- Section [${citations[0]?.heading || 'Abstract'}]: Directly addresses your inquiry regarding "${question}".
-- Quantitative & Architectural Evidence: The paper emphasizes structured multi-head mechanisms and constant computational path lengths to optimize training scalability.`;
-
-  return { answer, citations };
+  throw new Error(res.errorText || 'Failed to retrieve answer from Gemini model.');
 }
