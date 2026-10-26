@@ -37,15 +37,32 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
-// Persistent Data Storage Directories
-const DATA_DIR = path.join(__dirname, 'data');
+// Persistent Data Storage Directories (use /tmp on serverless environments like Vercel)
+const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.join(__dirname, 'data');
 const PDF_DIR = path.join(DATA_DIR, 'pdfs');
 const PAPERS_FILE = path.join(DATA_DIR, 'papers_db.json');
 const CHATS_FILE = path.join(DATA_DIR, 'chats_db.json');
 const USERS_FILE = path.join(DATA_DIR, 'users_db.json');
 
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
+
+  if (process.env.VERCEL) {
+    const bundledDataDir = path.join(__dirname, 'data');
+    if (fs.existsSync(bundledDataDir)) {
+      for (const file of ['papers_db.json', 'chats_db.json', 'users_db.json']) {
+        const srcPath = path.join(bundledDataDir, file);
+        const destPath = path.join(DATA_DIR, file);
+        if (fs.existsSync(srcPath) && !fs.existsSync(destPath)) {
+          fs.copyFileSync(srcPath, destPath);
+        }
+      }
+    }
+  }
+} catch (err) {
+  console.warn('[ScholarPulse] Notice during storage directory setup:', err);
+}
 
 /**
  * Universal PDF Buffer extractor supporting pdf-parse v2 and stream fallback
