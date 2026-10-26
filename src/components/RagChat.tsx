@@ -3,6 +3,7 @@ import { ChatMessage, CitationEvidence } from '../types';
 import { FormattedText } from './FormattedText';
 import { Send, MessageSquare, ChevronDown, ChevronUp, Copy, Check, Loader2, Sparkles } from 'lucide-react';
 import { User } from '../firebase';
+import { getPaperDetail, askPaperQuestion } from '../services/api';
 
 interface RagChatProps {
   paperId: string;
@@ -86,47 +87,21 @@ export const RagChat: React.FC<RagChatProps> = ({ paperId, paperTitle, currentUs
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/paper/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paperId,
-          question: q.trim(),
-          userId: currentUser?.uid,
-          userEmail: currentUser?.email,
-        }),
-      });
-
-      const contentType = res.headers.get('content-type') || '';
-      let data: any;
-
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        console.warn('Non-JSON response received:', text.slice(0, 150));
-        data = {
-          answer: `**Analysis for "${paperTitle}":**\n\nThe AI model synthesized the answer based on the indexed paper chunks and architecture principles. Please verify your query or rephrase if needed.`,
-          citations: [],
-        };
-      }
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to retrieve grounded answer.');
-      }
+      const paper = await getPaperDetail(paperId, currentUser || null);
+      const { answer, citations } = await askPaperQuestion(paperId, q.trim(), paper, currentUser || null);
 
       const botMsg: ChatMessage = {
         id: `bot_${Date.now()}`,
         userId: currentUser?.uid,
         sender: 'assistant',
-        text: data.answer,
-        citations: data.citations || [],
+        text: answer,
+        citations: citations || [],
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, botMsg]);
 
-      // Persist bot message to backend
+      // Attempt to persist bot message to backend
       fetch(`/api/paper/${paperId}/chats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

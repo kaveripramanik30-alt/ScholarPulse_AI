@@ -11,12 +11,14 @@ import { WorkspaceDrawer } from './components/WorkspaceDrawer';
 import { AuthModal } from './components/AuthModal';
 import { Loader2, AlertCircle, BookOpen, Sparkles, Plus } from 'lucide-react';
 import { auth, onAuthStateChanged, User } from './firebase';
+import { getPapersList, getPaperDetail, safeFetchJson } from './services/api';
+import { LANDMARK_PAPERS, getLandmarkPaperList } from './data/landmarkPapers';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [papers, setPapers] = useState<PaperListItem[]>([]);
+  const [papers, setPapers] = useState<PaperListItem[]>(getLandmarkPaperList());
   const [currentPaperId, setCurrentPaperId] = useState<string>('paper_transformer');
-  const [currentPaper, setCurrentPaper] = useState<PaperDetail | null>(null);
+  const [currentPaper, setCurrentPaper] = useState<PaperDetail | null>(LANDMARK_PAPERS.paper_transformer);
   const [activeTab, setActiveTab] = useState<'summary' | 'chat' | 'architecture'>('summary');
 
   // Modals & Drawers
@@ -41,64 +43,49 @@ export default function App() {
   // Fetch papers list on load or when auth user changes
   const loadPapers = async () => {
     try {
-      const params = new URLSearchParams();
-      if (currentUser?.uid) params.append('userId', currentUser.uid);
-      if (currentUser?.email) params.append('userEmail', currentUser.email);
-      const queryStr = params.toString();
-      const url = queryStr ? `/api/papers?${queryStr}` : '/api/papers';
+      const paperList = await getPapersList(currentUser);
+      setPapers(paperList);
 
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const paperList: PaperListItem[] = data.papers || [];
-        setPapers(paperList);
-
-        // Ensure active paper belongs to current account's workspace
-        setCurrentPaperId((prevId) => {
-          const isAccessible = paperList.some((p) => p.id === prevId);
-          if (!isAccessible) {
-            return paperList[0]?.id || 'paper_transformer';
-          }
-          return prevId;
-        });
-      }
+      // Ensure active paper belongs to current workspace
+      setCurrentPaperId((prevId) => {
+        const isAccessible = paperList.some((p) => p.id === prevId);
+        if (!isAccessible) {
+          return paperList[0]?.id || 'paper_transformer';
+        }
+        return prevId;
+      });
     } catch (err) {
-      console.warn('Failed to fetch papers list:', err);
+      console.warn('Paper list fetch notice:', err);
     }
   };
 
   // Fetch paper details when currentPaperId changes
   const loadPaperDetail = async (id: string) => {
-    setIsLoadingPaper(true);
-    setErrorMessage(null);
-    try {
-      const params = new URLSearchParams();
-      if (currentUser?.uid) params.append('userId', currentUser.uid);
-      if (currentUser?.email) params.append('userEmail', currentUser.email);
-      const queryStr = params.toString();
-      const url = queryStr ? `/api/papers/${id}?${queryStr}` : `/api/papers/${id}`;
+    // If already in landmark papers cache, set immediately without waiting
+    if (LANDMARK_PAPERS[id]) {
+      setCurrentPaper(LANDMARK_PAPERS[id]);
+      setErrorMessage(null);
+    } else {
+      setIsLoadingPaper(true);
+    }
 
-      const res = await fetch(url);
-      if (!res.ok) {
-        if (res.status === 403 || res.status === 404) {
-          if (id !== 'paper_transformer') {
-            setCurrentPaperId('paper_transformer');
-            return;
-          }
-        }
-        throw new Error(`Could not load paper ${id}`);
-      }
-      const data: PaperDetail = await res.json();
-      setCurrentPaper(data);
+    try {
+      const paper = await getPaperDetail(id, currentUser);
+      setCurrentPaper(paper);
+      setErrorMessage(null);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error loading paper details');
+      console.warn('Paper detail resolution notice:', err);
+      if (LANDMARK_PAPERS[id]) {
+        setCurrentPaper(LANDMARK_PAPERS[id]);
+      } else {
+        setErrorMessage(err.message || 'Error loading paper details');
+      }
     } finally {
       setIsLoadingPaper(false);
     }
   };
 
   useEffect(() => {
-    setCurrentPaper(null);
     loadPapers();
   }, [currentUser]);
 
@@ -115,7 +102,7 @@ export default function App() {
     setErrorMessage(null);
 
     try {
-      const res = await fetch('/api/paper/summarize', {
+      const res = await safeFetchJson<{ summary: any; error?: string }>('/api/paper/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -126,20 +113,25 @@ export default function App() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to synthesize summary');
+      if (res.ok && res.data?.summary) {
+        const summaryData = res.data.summary;
+        setCurrentPaper((prev) => (prev ? {
+          ...prev,
+          title: summaryData.title || prev.title,
+          authors: (summaryData.authors && summaryData.authors.length > 0 && summaryData.authors[0] !== 'Contributing Academic Researchers')
+            ? summaryData.authors
+            : prev.authors,
+          summary: summaryData,
+        } : null));
+        loadPapers();
+      } else {
+        // Fallback: If paper already has summary (e.g. landmark), inform user
+        if (currentPaper.summary) {
+          // Already summarized
+        } else {
+          setErrorMessage(res.errorText || 'Summarization notice: Server synthesis busy.');
+        }
       }
-
-      setCurrentPaper((prev) => (prev ? {
-        ...prev,
-        title: data.summary?.title || prev.title,
-        authors: (data.summary?.authors && data.summary.authors.length > 0 && data.summary.authors[0] !== 'Contributing Academic Researchers')
-          ? data.summary.authors
-          : prev.authors,
-        summary: data.summary,
-      } : null));
-      loadPapers(); // refresh summary status in list
     } catch (err: any) {
       setErrorMessage(err.message || 'Summarization failed');
     } finally {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, UploadCloud, Link as LinkIcon, Database, CheckCircle2, AlertCircle, Loader2, Sparkles, FileText } from 'lucide-react';
 import { User } from '../firebase';
+import { ingestArxivPaper, ingestDoiPaper, ingestPdfFile } from '../services/api';
 
 interface IngestModalProps {
   isOpen: boolean;
@@ -34,26 +35,16 @@ export const IngestModal: React.FC<IngestModalProps> = ({
     setSuccessMsg(null);
 
     try {
-      const res = await fetch('/api/paper/arxiv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input: arxivInput,
-          userId: currentUser?.uid,
-          userEmail: currentUser?.email,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to parse arXiv paper');
+      const result = await ingestArxivPaper(arxivInput, currentUser || null);
+      if (result.success && result.paperId) {
+        setSuccessMsg(`Successfully ingested "${result.title}"`);
+        setTimeout(() => {
+          onPaperIngested(result.paperId);
+          onClose();
+        }, 600);
+      } else {
+        throw new Error('Failed to resolve arXiv paper');
       }
-
-      setSuccessMsg(`Successfully parsed "${data.title}"`);
-      setTimeout(() => {
-        onPaperIngested(data.paperId);
-        onClose();
-      }, 700);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error occurred while contacting arXiv');
     } finally {
@@ -70,26 +61,16 @@ export const IngestModal: React.FC<IngestModalProps> = ({
     setSuccessMsg(null);
 
     try {
-      const res = await fetch('/api/paper/doi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          doi: doiInput,
-          userId: currentUser?.uid,
-          userEmail: currentUser?.email,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to resolve DOI');
+      const result = await ingestDoiPaper(doiInput, currentUser || null);
+      if (result.success && result.paperId) {
+        setSuccessMsg(`Successfully resolved "${result.title}"`);
+        setTimeout(() => {
+          onPaperIngested(result.paperId);
+          onClose();
+        }, 600);
+      } else {
+        throw new Error('Failed to resolve DOI identifier');
       }
-
-      setSuccessMsg(`Successfully resolved "${data.title}"`);
-      setTimeout(() => {
-        onPaperIngested(data.paperId);
-        onClose();
-      }, 700);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error occurred while resolving DOI via CrossRef');
     } finally {
@@ -106,30 +87,16 @@ export const IngestModal: React.FC<IngestModalProps> = ({
     setSuccessMsg(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      if (currentUser?.uid) {
-        formData.append('userId', currentUser.uid);
+      const result = await ingestPdfFile(selectedFile, currentUser || null);
+      if (result.success && result.paperId) {
+        setSuccessMsg(`Extracted manuscript "${result.title}"`);
+        setTimeout(() => {
+          onPaperIngested(result.paperId);
+          onClose();
+        }, 600);
+      } else {
+        throw new Error('Failed to process uploaded PDF');
       }
-      if (currentUser?.email) {
-        formData.append('userEmail', currentUser.email);
-      }
-
-      const res = await fetch('/api/paper/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to process uploaded PDF');
-      }
-
-      setSuccessMsg(`Extracted ${data.sectionsCount} sections and ${data.chunksCount} chunks.`);
-      setTimeout(() => {
-        onPaperIngested(data.paperId);
-        onClose();
-      }, 800);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error uploading and extracting PDF');
     } finally {

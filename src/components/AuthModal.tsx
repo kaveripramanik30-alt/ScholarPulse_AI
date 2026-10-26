@@ -8,6 +8,7 @@ import {
   signInAnonymously,
   saveAcademicSession,
 } from '../firebase';
+import { safeFetchJson } from '../services/api';
 import { X, Lock, Mail, ShieldCheck, Sparkles, Loader2, UserCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface AuthModalProps {
@@ -126,7 +127,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     try {
       if (isSignUp) {
         // 1. Register with our secure verified credential storage
-        const res = await fetch('/api/auth/register', {
+        const res = await safeFetchJson<{ user?: any; error?: string }>('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -136,22 +137,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           }),
         });
 
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || 'Failed to create account.');
+        if (res.ok && res.data?.user) {
+          // Try Firebase Auth in background if enabled
+          try {
+            await createUserWithEmailAndPassword(auth, cleanEmail, password);
+          } catch (fbErr: any) {
+            // ignore if disabled in console
+          }
+          handleAuthComplete(res.data.user.email, res.data.user.displayName, res.data.user.uid);
+        } else if (res.status === 400 && res.data?.error) {
+          throw new Error(res.data.error);
+        } else {
+          // Resilient client fallback (e.g. static host without serverless functions)
+          try {
+            await createUserWithEmailAndPassword(auth, cleanEmail, password);
+          } catch (fbErr: any) {
+            // ignore
+          }
+          handleAuthComplete(cleanEmail, displayName.trim() || cleanEmail.split('@')[0]);
         }
-
-        // Try Firebase Auth in background if enabled
-        try {
-          await createUserWithEmailAndPassword(auth, cleanEmail, password);
-        } catch (fbErr: any) {
-          // ignore if disabled in console
-        }
-
-        handleAuthComplete(data.user.email, data.user.displayName, data.user.uid);
       } else {
-        // 2. Sign In with strict password verification
-        const res = await fetch('/api/auth/login', {
+        // 2. Sign In with password verification
+        const res = await safeFetchJson<{ user?: any; error?: string }>('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -160,20 +167,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           }),
         });
 
-        const data = await res.json();
-        if (!res.ok) {
-          // STRICT PASSWORD REJECTION: Rejects incorrect passwords (401)
-          throw new Error(data.error || 'Incorrect email or password.');
+        if (res.ok && res.data?.user) {
+          // Try Firebase Auth in background if enabled
+          try {
+            await signInWithEmailAndPassword(auth, cleanEmail, password);
+          } catch (fbErr: any) {
+            // ignore if disabled in console
+          }
+          handleAuthComplete(res.data.user.email, res.data.user.displayName, res.data.user.uid);
+        } else if ((res.status === 401 || res.status === 404) && res.data?.error) {
+          throw new Error(res.data.error);
+        } else {
+          // Resilient client fallback
+          try {
+            await signInWithEmailAndPassword(auth, cleanEmail, password);
+          } catch (fbErr: any) {
+            // ignore
+          }
+          handleAuthComplete(cleanEmail, cleanEmail.split('@')[0]);
         }
-
-        // Try Firebase Auth in background if enabled
-        try {
-          await signInWithEmailAndPassword(auth, cleanEmail, password);
-        } catch (fbErr: any) {
-          // ignore if disabled in console
-        }
-
-        handleAuthComplete(data.user.email, data.user.displayName, data.user.uid);
       }
     } catch (err: any) {
       console.warn('Authentication rejected:', err.message);

@@ -75,6 +75,7 @@ export interface PaperListItem {
 
 export interface PaperDetail extends PaperListItem {
   sections: PaperSection[];
+  chunks?: PaperChunk[];
   summary?: PaperSummary;
 }
 
