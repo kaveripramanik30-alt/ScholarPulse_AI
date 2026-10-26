@@ -16,5 +16,14 @@
     "displayName": "K P",
     "createdAt": "2026-10-12T06:56:51.683Z",
     "lastLogin": "2026-10-12T07:39:45.495Z"
+  },
+  {
+    "uid": "user_be07e1fdaa8f4c21",
+    "email": "test@scholar.edu",
+    "passwordHash": "ff77284041dcb67e54e3cdfaf2f5191930956dda459310ba2ba522ee86df6c95",
+    "salt": "e113dd4d7cb8876a98fc9bc496783e80",
+    "displayName": "Dr. Test",
+    "createdAt": "2026-10-26T18:51:23.288Z",
+    "lastLogin": "2026-10-26T18:51:26.504Z"
   }
 ]
