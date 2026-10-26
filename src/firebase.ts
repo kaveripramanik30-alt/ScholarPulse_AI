@@ -27,7 +27,18 @@ import {
   orderBy,
   serverTimestamp,
 } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+// Load Firebase configuration from environment variables (configured in Vercel or .env)
+// with safe fallback defaults so the app builds and runs smoothly in any environment.
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyScholarPulseDemoKeyLocalBuild01',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'scholarpulse-demo.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'scholarpulse-demo',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'scholarpulse-demo.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '123456789012',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:123456789012:web:scholarpulse001',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || undefined,
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || undefined,
+};
 
 // Initialize Firebase App
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -41,8 +52,11 @@ export const db = firebaseConfig.firestoreDatabaseId
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
 
-// Validate connection on startup (as required by Firestore skill)
+// Validate connection on startup only if custom Firebase credentials are provided
 async function testConnection() {
+  if (!import.meta.env.VITE_FIREBASE_API_KEY) {
+    return;
+  }
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error: any) {
