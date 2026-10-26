@@ -17,7 +17,6 @@ import { Agent, setGlobalDispatcher } from 'undici';
 import * as pdfParseModule from 'pdf-parse';
 import { jsPDF } from 'jspdf';
 import crypto from 'crypto';
-import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
 
@@ -123,6 +122,24 @@ const upload = multer({
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+
+// Resilient URL normalization for Vercel serverless functions & edge rewrites
+app.use((req, res, next) => {
+  const matchedPath = (req.headers['x-matched-path'] || req.headers['x-forwarded-uri']) as string | undefined;
+  if (matchedPath && matchedPath.startsWith('/api')) {
+    const qIdx = req.url.indexOf('?');
+    const qs = qIdx !== -1 ? req.url.slice(qIdx) : '';
+    req.url = matchedPath + qs;
+  } else if (!req.url.startsWith('/api') && !req.url.startsWith('/assets') && req.url !== '/' && req.url !== '/index.html') {
+    const qIdx = req.url.indexOf('?');
+    const pathPart = qIdx !== -1 ? req.url.slice(0, qIdx) : req.url;
+    const qs = qIdx !== -1 ? req.url.slice(qIdx) : '';
+    if (!pathPart.includes('index')) {
+      req.url = `/api${pathPart.startsWith('/') ? '' : '/'}${pathPart}${qs}`;
+    }
+  }
+  next();
+});
 
 // Server-side Gemini initialization
 const ai = new GoogleGenAI({
@@ -2487,6 +2504,7 @@ async function startServer() {
   const isDev = process.env.NODE_ENV !== 'production';
 
   if (isDev) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
