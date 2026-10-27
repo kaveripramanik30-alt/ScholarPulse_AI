@@ -6,7 +6,8 @@
  * and intuitive grounded RAG Q&A with citations.
  */
 
-import express, { Request, Response } from 'express';
+import express from 'express';
+import type { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -1754,7 +1755,10 @@ app.post('/api/paper/arxiv', async (req: Request, res: Response) => {
     let pdfBuf: Buffer | undefined;
 
     try {
-      const pdfResp = await fetch(pdfUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ScholarPulse/1.0' } });
+      const pdfResp = await fetch(pdfUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ScholarPulse/1.0' },
+        signal: AbortSignal.timeout(3500),
+      });
       if (pdfResp.ok) {
         const arrayBuf = await pdfResp.arrayBuffer();
         pdfBuf = Buffer.from(arrayBuf);
@@ -1800,14 +1804,29 @@ app.post('/api/paper/arxiv', async (req: Request, res: Response) => {
       createdAt: new Date().toISOString(),
     };
 
+    // Seed with high-fidelity structural synthesis immediately
+    record.summary = synthesizeFallbackSummary(record);
+    savePaper(record);
+
+    // Fast-path: attempt full Gemini 3.8 Flash synthesis if responsive within 3.8s, otherwise complete in background
     try {
-      record.summary = await generateAndAttachSummary(record);
+      const fastSummaryPromise = generateAndAttachSummary(record);
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3800));
+      const maybeSummary = await Promise.race([fastSummaryPromise, timeoutPromise]);
+      if (maybeSummary) {
+        record.summary = maybeSummary;
+        savePaper(record);
+      } else {
+        fastSummaryPromise
+          .then((deepSummary) => {
+            record.summary = deepSummary;
+            savePaper(record);
+          })
+          .catch((bgErr) => console.warn('Background summary generation notice:', bgErr));
+      }
     } catch (sumErr) {
       console.warn('Auto-summarization note during arXiv ingestion:', sumErr);
-      record.summary = synthesizeFallbackSummary(record);
     }
-
-    savePaper(record);
 
     res.json({
       success: true,
@@ -2180,7 +2199,7 @@ JSON Schema:
     const responseText = await generateGeminiWithFallback({
       contents: prompt,
       responseMimeType: 'application/json',
-      perModelTimeoutMs: 38000,
+      perModelTimeoutMs: 12000,
     });
 
     let parsed: any;
@@ -2540,7 +2559,13 @@ async function startServer() {
   });
 }
 
-// Start listener when executed directly (not in Vercel serverless function)
-if (!process.env.VERCEL) {
+// Start listener only when executed directly (not when imported in Vercel serverless function)
+const isMainModule = !process.env.VERCEL && (
+  Boolean(process.argv[1]?.endsWith('server.ts') || process.argv[1]?.endsWith('server.js')) ||
+  process.env.npm_lifecycle_event === 'dev' ||
+  process.env.npm_lifecycle_event === 'start'
+);
+
+if (isMainModule) {
   startServer();
 }

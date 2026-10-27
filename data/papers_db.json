@@ -203,7 +203,7 @@
     },
     "pdfUrl": "https://arxiv.org/pdf/1706.03762.pdf",
     "ingestionSource": "curated",
-    "createdAt": "2026-10-26T19:58:21.571Z"
+    "createdAt": "2026-10-26T20:16:54.810Z"
   },
   {
     "id": "paper_lora",
@@ -348,7 +348,7 @@
     },
     "pdfUrl": "https://arxiv.org/pdf/2106.09685.pdf",
     "ingestionSource": "curated",
-    "createdAt": "2026-10-26T19:58:21.587Z"
+    "createdAt": "2026-10-26T20:16:54.825Z"
   },
   {
     "id": "paper_arxiv_2610_11637",
@@ -975,7 +975,7 @@
     ],
     "pdfUrl": "https://arxiv.org/pdf/2610.30673.pdf",
     "ingestionSource": "arxiv",
-    "createdAt": "2026-10-26T19:58:33.495Z",
+    "createdAt": "2026-10-26T20:31:44.214Z",
     "summary": {
       "title": "A 13 Year Black Hole Microlensing Survey in Omega Centauri",
       "authors": [
@@ -996,68 +996,68 @@
       ],
       "publicationDate": "2026-10-23",
       "venueOrCategory": "arXiv:2610.30673",
-      "executiveSummary": "This research addresses the long-standing challenge of detecting stellar-mass black holes (BHs) within globular clusters (GCs). While BHs are predicted to form in large numbers within dense stellar systems, direct observational evidence remains scarce, hindering our understanding of their role in binary BH mergers detected via gravitational waves. The study presents a comprehensive 13-year microlensing survey of the Omega Centauri cluster, utilizing archival data to identify transient light curve deviations characteristic of gravitational microlensing by massive compact objects.\n\nBy systematically analyzing 174 exposures in the F606W band, the authors overcome the challenges of stellar crowding and varying photometric quality. The methodology employs a robust statistical framework for photometric error estimation, specifically designed to be resilient against outliers, to isolate potential microlensing events from stellar variability. This survey contributes critical observational constraints on the BH population of Omega Centauri, bridging the gap between theoretical predictions of dynamical mass segregation and the reality of gravitational wave progenitors.",
+      "executiveSummary": "This research addresses the longstanding uncertainty regarding the distribution and population of stellar-mass black holes (BHs) within globular clusters (GCs), specifically Omega Centauri. While hierarchical merging theory suggests that massive star clusters serve as breeding grounds for gravitational-wave-detected binary black holes, direct observational evidence of isolated or binary BHs in GCs remains sparse. The authors conduct a comprehensive 13-year microlensing survey, leveraging historical photometry to identify temporary, gravity-induced magnification events that signal the presence of dark, compact objects.\n\nBy systematically analyzing 174 filtered exposures in the F606W band, the study implements a robust photometric error estimation framework that accounts for the challenges of high stellar density and crowding. The work establishes a clear, consistent methodology for isolating transient lensing signals from photometric noise, providing a critical diagnostic tool to constrain the BH population in Omega Centauri and, by extension, the broader evolution of star clusters and their potential as gravitational-wave progenitor environments.",
       "coreContributions": [
-        "1. Provided a multi-epoch, 13-year baseline survey of Omega Centauri, significantly extending the temporal window for identifying rare, long-duration microlensing events associated with stellar-mass BHs.",
-        "2. Implemented a robust, empirical photometric error estimation model (sigma_G) that accounts for high stellar crowding in dense clusters, ensuring reliable outlier rejection.",
-        "3. Formalized a data selection and quality control pipeline to normalize signal-to-noise ratios across disparate archival exposure times.",
-        "4. Established new observational limits on the presence and spatial distribution of stellar-mass BHs in Omega Centauri, directly informing hierarchical merging models in globular clusters."
+        "1. Paradigm shift toward using long-baseline photometric surveys as a census tool for non-interacting stellar-mass black holes in globular clusters, moving beyond the reliance on rare binary-system detections.",
+        "2. Architectural design of a high-precision photometric cleanup pipeline that standardizes exposure time across 13 years of heterogeneous data to ensure consistent signal-to-noise ratios.",
+        "3. Algorithmic formulation of a robust standard deviation estimator (sigma_G) that mitigates the impact of outliers and crowding-induced noise by utilizing the interquartile range of measurement distributions.",
+        "4. Empirical establishment of a 13-year baseline for microlensing, which significantly expands the window for capturing long-duration events compared to previous short-term studies."
       ],
       "methodology": {
-        "architecture": "The study utilizes an end-to-end processing pipeline beginning with high-resolution image acquisition, followed by rigorous data quality control. It enforces consistent signal-to-noise ratios by filtering exposures outside the 35–100s range. The pipeline utilizes neighbor-subtracted photometry to mitigate severe blending issues inherent in the core of Omega Centauri, where stellar density is highest.",
+        "architecture": "The study employs a multi-epoch photometric pipeline designed for high-density environments like the core of Omega Centauri. The process begins with rigorous data pruning, eliminating exposures with suboptimal exposure times (below 35s or above 100s) to harmonize the dataset. The core engine relies on neighbor-subtracted single exposure analysis to isolate flux variations of individual stars against a crowded background. Transformations involve fixing positional coordinates across all epochs to maintain alignment, allowing for precise lightcurve construction.",
         "keyTechniques": [
-          "Technique 1: Neighbor-subtracted single exposure photometry, which fixes source positions across all epochs to maintain spatial consistency despite the crowded environment.",
-          "Technique 2: Empirical error estimation using the inter-quartile range (IQR) to calculate a robust standard deviation, preventing inflation of photometric errors by true astrophysical events.",
-          "Technique 3: Dynamic exposure filtering that ensures uniform photometric sensitivity, effectively discarding non-representative or saturated data points that could induce false-positive microlensing triggers."
+          "Technique 1: Exposure Time Harmonization—Standardizing the input data by removing epochs with extreme exposure durations to prevent systematic errors in signal-to-noise calculations.",
+          "Technique 2: Robust Photometric Error Estimation—Utilizing the interquartile range to define an error metric (sigma_G) that is inherently resistant to heavy-tailed photometric outliers typical of crowded GC fields.",
+          "Technique 3: Neighbor-Subtracted PSF Fitting—Employing advanced point-spread function (PSF) modeling to isolate star flux, ensuring that microlensing signals are not confused by neighboring source interference."
         ],
         "benchmarksUsed": [
-          "Omega Centauri (NGC 5139) archive: A long-term dataset comprising 174 F606W exposures spanning over a decade, providing a dense temporal baseline for variability detection."
+          "13-Year Omega Centauri Photometric Dataset: A legacy archive of Hubble-style observations encompassing 174 exposures in the F606W filter, analyzed to identify transient magnification events.",
+          "Häberle et al. (2024a) Photometric Model: Used as a baseline for error characterization, modified here to incorporate empirical crowding adjustments."
         ],
-        "mathematicalFormulation": "sigma_G = 0.7413 * (q_75 - q_25). The variable sigma_G represents the robust estimate of the standard deviation. The constant 0.7413 is the scaling factor required to map the inter-quartile range to the standard deviation of a normal distribution. q_75 denotes the 75th percentile of the photometric measurements (third quartile), and q_25 denotes the 25th percentile (first quartile)."
+        "mathematicalFormulation": "sigma_G = 0.7413 * (q_75 - q_25). Here, sigma_G represents the robust standard deviation, 0.7413 is the conversion constant used to scale the interquartile range (IQR) to the standard deviation of a Gaussian distribution, q_75 is the 75th percentile of the measurements, and q_25 is the 25th percentile of the measurements."
       },
       "keyFindings": {
         "quantitativeResults": [
-          "Successfully processed 174 distinct F606W exposures spanning 13 years, effectively filtering out noise through the 35s–100s exposure threshold.",
-          "The application of the sigma_G metric ensured that true lensing events, which typically impact less than 10 percent of a light curve, remained statistically distinct from photometric noise.",
-          "The study establishes that current data processing constraints allow for the detection of events with ~1 year characteristic timescales."
+          "Successfully processed 174 distinct epochs into a consistent time-series format.",
+          "Demonstrated that the sigma_G approach effectively filters out noise in environments where typical standard deviation calculations would be inflated by crowding.",
+          "Validated that the survey sensitivity is sufficient to detect lensing events with expected durations of ~1 year, which represent only ~10% of total lightcurve data points."
         ],
         "qualitativeInsights": [
-          "The density of Omega Centauri requires specialized photometric methods that fix source positions based on global imaging rather than individual frame detections, highlighting the necessity of advanced point spread function (PSF) fitting.",
-          "The spatial distribution of stellar-mass BHs is confirmed to be highly sensitive to the initial dynamical conditions of the cluster formation, suggesting that BH retention is a localized process."
+          "Discovery that traditional standard deviation models significantly underestimate the impact of stellar crowding in dense clusters.",
+          "The 13-year observation window acts as a critical filter, naturally rejecting short-term variable stars while highlighting long-duration lensing events."
         ]
       },
       "limitations": [
-        "The survey is limited by the sampling frequency of archival data, which may fail to capture high-cadence variability in transient events.",
-        "The photometric model assumes that stellar crowding is the dominant error source, which may not hold in the absolute outskirts of the cluster where sky background noise becomes relevant.",
-        "The current detection capability is predicated on long-duration lensing; shorter lensing events may still be obscured by intrinsic stellar variability not fully accounted for in this analysis."
+        "The survey is inherently limited by the spatial density of Omega Centauri, which makes sub-arcsecond blending a persistent challenge for absolute photometric accuracy.",
+        "Theoretical assumptions regarding the mass distribution of dark remnants rely on current dynamical models of GC evolution, which may evolve with new gravitational-wave observations.",
+        "Sensitivity is capped by the temporal gaps between the 174 available archival exposures, potentially missing short-duration lensing peaks."
       ],
       "practicalImplications": [
-        "Researchers utilizing this pipeline should prioritize consistent exposure times in future surveys to avoid the loss of data inherent in aggressive quality filtering.",
-        "The sigma_G error estimation technique is highly recommended for photometric studies in any environment with extreme stellar crowding, as it avoids the pitfalls of classical mean-squared error estimators.",
-        "Data archival researchers must account for the degradation of image quality over time, requiring periodic re-calibration of the PSF models."
+        "Researchers should adopt the sigma_G robust error metric for any long-term variability study in crowded astronomical fields.",
+        "Data preprocessing pipelines for historical archives must prioritize the removal of heterogeneous exposure times to maintain a stable statistical foundation.",
+        "Future surveys should aim for higher cadence to bridge gaps that might obscure the onset or decay phases of microlensing events."
       ],
       "keyEquationsOrTheorems": [
         {
-          "label": "Robust Standard Deviation Estimation",
-          "formulaOrDescription": "sigma_G = 0.7413 * (q_75 - q_25); where sigma_G is the standard deviation proxy, 0.7413 is the normal distribution scaling constant, and q_75 - q_25 is the inter-quartile range of the measured magnitudes."
+          "label": "Robust Photometric Error Metric",
+          "formulaOrDescription": "sigma_G = 0.7413 * (q_75 - q_25). This equation defines a robust estimate of dispersion by mapping the interquartile range to the standard deviation of a normal distribution. It is critical for maintaining sensitivity in crowded stellar fields where outliers would otherwise bias a standard root-mean-square calculation."
         }
       ],
       "criticalEvaluation": {
         "strengths": [
-          "Methodological rigor in handling high-density stellar fields.",
-          "Statistical robustness provided by the use of IQR-based error estimation rather than standard variance."
+          "High methodological rigor in handling legacy heterogeneous data.",
+          "Well-defined robust statistical approach to crowding."
         ],
         "weaknesses": [
-          "Limited discussion on potential false-positive triggers from cataclysmic variables or other long-period stellar variables.",
-          "Absence of a mock injection study to determine the actual detection efficiency (completeness) of the pipeline."
+          "Limited discussion on the impact of potential variable star contaminants.",
+          "Lack of specific simulated injections to quantify detection completeness."
         ],
         "potentialBiases": [
-          "Potential bias toward the cluster core due to the selection of high-density exposure frames.",
-          "Archival sampling bias where certain years may have higher temporal resolution than others."
+          "Selection bias toward brighter, less-crowded stars due to the inherent constraints of PSF-fitting in dense cores."
         ]
       },
-      "bibtexCitation": "@article{freeman2026microlensing, title={A 13 Year Black Hole Microlensing Survey in Omega Centauri}, author={Zack Freeman and others}, journal={arXiv:2610.30673}, year={2026}}",
-      "apaCitation": "Freeman, Z., Häberle, M., Seth, A., Zaris, J., Whitaker, M., Rodriguez, C. L., ... & Veske, D. (2026). A 13 Year Black Hole Microlensing Survey in Omega Centauri. arXiv:2610.30673."
+      "bibtexCitation": "@article{freeman2026microlensing, title={A 13 Year Black Hole Microlensing Survey in Omega Centauri}, author={Freeman, Zack and Häberle, Maximilian and Seth, Anil and others}, journal={arXiv preprint arXiv:2610.30673}, year={2026}}",
+      "apaCitation": "Freeman, Z., Häberle, M., Seth, A., Zaris, J., Whitaker, M., Rodriguez, C. L., ... & Veske, D. (2026). A 13 Year Black Hole Microlensing Survey in Omega Centauri. arXiv preprint arXiv:2610.30673."
     }
   }
 ]
