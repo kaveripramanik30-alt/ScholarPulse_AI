@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { Agent, setGlobalDispatcher } from 'undici';
-import * as pdfParseModule from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import { jsPDF } from 'jspdf';
 import crypto from 'crypto';
 
@@ -69,7 +69,7 @@ try {
  */
 async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; numpages: number }> {
   try {
-    const PDFParseClass = (pdfParseModule as any).PDFParse || (pdfParseModule as any).default?.PDFParse;
+    const PDFParseClass: any = PDFParse;
     if (typeof PDFParseClass === 'function') {
       const parser = new PDFParseClass({ data: buffer });
       if (typeof parser.load === 'function') {
@@ -88,9 +88,6 @@ async function parsePdfBuffer(buffer: Buffer): Promise<{ text: string; numpages:
       if (text && text.trim().length > 50) {
         return { text, numpages: pages };
       }
-    } else if (typeof pdfParseModule === 'function') {
-      const res = await (pdfParseModule as any)(buffer);
-      return { text: res.text || '', numpages: res.numpages || 1 };
     }
   } catch (err) {
     console.warn('PDF library extraction note, using stream heuristic fallback:', err);
@@ -1223,8 +1220,7 @@ function seedLandmarkPapers() {
     createdAt: new Date().toISOString(),
   };
 
-  transformerRecord.pdfBuffer = generatePaperPdfBuffer(transformerRecord);
-  savePaper(transformerRecord);
+  papersStore.set(transformerRecord.id, transformerRecord);
 
   // Second curated landmark: LoRA
   const loraSummary: PaperSummary = {
@@ -1345,8 +1341,7 @@ function seedLandmarkPapers() {
     createdAt: new Date().toISOString(),
   };
 
-  loraRecord.pdfBuffer = generatePaperPdfBuffer(loraRecord);
-  savePaper(loraRecord);
+  papersStore.set(loraRecord.id, loraRecord);
 }
 
 // Load disk data and ensure seed papers
@@ -2541,7 +2536,8 @@ async function startServer() {
   const isDev = process.env.NODE_ENV !== 'production';
 
   if (isDev) {
-    const { createServer: createViteServer } = await import('vite');
+    const vitePkg = 'vite';
+    const { createServer: createViteServer } = await import(/* @vite-ignore */ vitePkg);
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
