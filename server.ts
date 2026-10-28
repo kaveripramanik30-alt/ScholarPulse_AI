@@ -22,14 +22,18 @@ import crypto from 'crypto';
 dotenv.config();
 
 // Configure Node undici fetch dispatcher to prevent socket timeouts on LLM operations
-setGlobalDispatcher(
-  new Agent({
-    headersTimeout: 120_000,
-    bodyTimeout: 120_000,
-    connectTimeout: 30_000,
-    keepAliveTimeout: 60_000,
-  })
-);
+try {
+  setGlobalDispatcher(
+    new Agent({
+      headersTimeout: 120_000,
+      bodyTimeout: 120_000,
+      connectTimeout: 30_000,
+      keepAliveTimeout: 60_000,
+    })
+  );
+} catch (dispatcherErr) {
+  console.warn('[ScholarPulse] undici dispatcher setup note:', dispatcherErr);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1934,12 +1938,19 @@ async function generateGeminiWithFallback(options: {
   responseMimeType?: string;
   perModelTimeoutMs?: number;
 }): Promise<string> {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY environment variable is not configured.');
+  }
+
   const models = [
     'gemini-3.8-flash',
-    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
     'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
   ];
-  const timeoutMs = options.perModelTimeoutMs || 35000;
+  const timeoutMs = options.perModelTimeoutMs || 30000;
 
   let lastError: any = null;
 

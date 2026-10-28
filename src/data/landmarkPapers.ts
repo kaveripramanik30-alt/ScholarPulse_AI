@@ -344,6 +344,112 @@ export const FLASH_ATTENTION_CHUNKS: PaperChunk[] = FLASH_ATTENTION_SECTIONS.map
   tokenEstimate: Math.round(sec.charCount / 4),
 }));
 
+export const DEEPSEEK_R1_SUMMARY: PaperSummary = {
+  title: 'DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning',
+  authors: ['DeepSeek-AI', 'Daya Guo', 'Dejian Yang', 'Haowei Zhang', 'Junxiao Song', 'Ruoyu Zhang', 'Runxin Xu', 'Qihao Zhu', 'Shirong Ma', 'Peiyi Wang'],
+  publicationDate: '2025',
+  venueOrCategory: 'arXiv preprint cs.CL (2025)',
+  executiveSummary: 'DeepSeek-R1 represents a breakthrough in post-training reasoning paradigms for large language models. The authors introduce DeepSeek-R1-Zero, a model trained via pure large-scale Reinforcement Learning (RL) using Group Relative Policy Optimization (GRPO) without any initial supervised fine-tuning (SFT) data. DeepSeek-R1-Zero demonstrates the spontaneous emergence of sophisticated reasoning behaviors, including self-verification, reflection, backtracking, and long-chain exploration. To overcome linguistic mixing and improve readability, the full DeepSeek-R1 pipeline integrates multi-stage training: cold-start high-quality reasoning SFT, reasoning-oriented RL, rejection sampling, and general RL, matching OpenAI-o1 performance across mathematical reasoning, coding competitions, and scientific benchmarks.',
+  coreContributions: [
+    'Pure RL Reasoning Emergence: Demonstrates that advanced reasoning capabilities can be incentivized purely through reinforcement learning without supervised demonstration data.',
+    'Group Relative Policy Optimization (GRPO): Replaces value network critic estimation with group-normalized baseline rewards, reducing GPU memory by 50% during RL training.',
+    'Multi-Stage Training Architecture: Formulates cold-start data collection, reasoning-focused RL, rejection sampling distillation, and alignment with human preference.',
+    'Open Distillation Paradigm: Distills reasoning capabilities into dense models (1.5B, 7B, 14B, 32B, 70B based on Qwen and Llama), outperforming open-source baselines by wide margins.',
+    'Parity with Proprietary Reasoning Models: Achieves 79.8% Pass@1 on AIME 2024 and 97.3% on MATH-500, rivaling OpenAI-o1-0912.',
+  ],
+  methodology: {
+    architecture: 'DeepSeek-R1 is built upon the DeepSeek-V3 MoE (Mixture-of-Experts) base architecture comprising 671B total parameters with 37B activated per token across 256 routed experts and shared attention. Reinforcement learning is orchestrated using GRPO, which generates a group of outputs {o_1, ..., o_G} for each prompt q, scores each output via rule-based accuracy and format verification, and normalizes advantages across the group.',
+    keyTechniques: [
+      'Group Relative Policy Optimization: Computes advantage A_i = (R_i - mean(R)) / std(R) across group samples without requiring a memory-intensive critic model',
+      'Rule-Based Reward Modeling: Employs deterministic accuracy rewards (e.g. checking mathematical answers and test-case execution for code) and format rewards (enforcing <think>...</think> reasoning blocks)',
+      'Cold-Start Demonstration Fine-Tuning: Small curated dataset of thousands of readable long-chain-of-thought traces to eliminate multilingual mixing',
+      'Reasoning Distillation: Transfers 800k curated reasoning traces from DeepSeek-R1 into smaller dense student models',
+    ],
+    benchmarksUsed: [
+      'AIME 2024 (American Invitational Mathematics Examination)',
+      'MATH-500 (Comprehensive High School Competition Math)',
+      'Codeforces (Competitive Programming Rating Benchmark)',
+      'MMLU & GPQA Diamond (Graduate-Level Scientific Reasoning)',
+    ],
+    mathematicalFormulation: 'J_{GRPO}(\\theta) = \\mathbb{E}_{q \\sim P(Q), \\{o_i\\}_{i=1}^G \\sim \\pi_{\\theta_{old}}(O|q)} \\left[ \\frac{1}{G} \\sum_{i=1}^G \\left( \\min\\left( \\frac{\\pi_\\theta(o_i|q)}{\\pi_{\\theta_{old}}(o_i|q)} A_i, \\text{clip}\\left(\\frac{\\pi_\\theta(o_i|q)}{\\pi_{\\theta_{old}}(o_i|q)}, 1-\\epsilon, 1+\\epsilon\\right) A_i \\right) - \\beta D_{KL}(\\pi_\\theta || \\pi_{ref}) \\right) \\right]',
+  },
+  keyFindings: {
+    quantitativeResults: [
+      'AIME 2024: DeepSeek-R1 achieves 79.8% Pass@1 (and 92.5% with consensus voting), matching OpenAI-o1 (79.2%).',
+      'MATH-500: Reaches 97.3% accuracy, outperforming all previous open and proprietary models.',
+      'Codeforces: Achieves a competitive programming rating of 2029 (top 96.3 percentile among human competitive programmers).',
+      'Distilled Small Models: DeepSeek-R1-Distill-Qwen-32B achieves 72.6% on AIME 2024, surpassing all open-weight models under 70B.',
+    ],
+    qualitativeInsights: [
+      'Spontaneous emergence of "Aha Moments": During RL training, the model autonomously learned to re-read problem statements, detect internal logical errors, and restart reasoning branches from first principles.',
+      'Test-time scaling dynamics: Extending reasoning token length during inference consistently yields higher problem-solving accuracy.',
+    ],
+  },
+  limitations: [
+    'Language mixing: Pure RL models occasionally mix English and Chinese within reasoning traces when prompted in multilingual contexts.',
+    'Format sensitivity: Requires strict adherence to XML delimiters (<think>...</think>) for downstream parsing.',
+    'Software engineering and tool use: Lower performance on multi-turn software development and broad tool orchestration compared to general conversational agents.',
+  ],
+  practicalImplications: [
+    'Democratizes frontier reasoning capabilities without needing proprietary closed APIs.',
+    'Provides open distilled model weights (1.5B to 70B) capable of running locally on consumer hardware.',
+    'Validates that rule-based verifiers and pure RL can unlock reasoning capabilities beyond human demonstrations.',
+  ],
+  keyEquationsOrTheorems: [
+    {
+      label: 'GRPO Advantage Normalization',
+      formulaOrDescription: 'A_i = (R_i - \\text{mean}(\\{R_1, ..., R_G\\})) / (\\text{std}(\\{R_1, ..., R_G\\}) + \\epsilon)',
+    },
+    {
+      label: 'Combined Rule-Based Reward',
+      formulaOrDescription: 'R_{total} = R_{accuracy} + \\lambda_{format} R_{format} + \\lambda_{language} R_{consistency}',
+    },
+  ],
+  criticalEvaluation: {
+    strengths: ['Groundbreaking open-source contribution with fully transparent training recipe', 'State-of-the-art empirical performance matching top closed models'],
+    weaknesses: ['Massive compute infrastructure required for reproducing the 671B base model pre-training'],
+    potentialBiases: ['Benchmark evaluation focuses predominantly on STEM and formal reasoning rather than creative expression'],
+  },
+  bibtexCitation: `@article{deepseek2025deepseekr1,
+  title={DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning},
+  author={DeepSeek-AI and Guo, Daya and Yang, Dejian and Zhang, Haowei and Song, Junxiao and others},
+  journal={arXiv preprint arXiv:2501.12948},
+  year={2025}
+}`,
+  apaCitation: 'DeepSeek-AI, Guo, D., Yang, D., Zhang, H., Song, J., et al. (2025). DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning. arXiv preprint arXiv:2501.12948.',
+};
+
+export const DEEPSEEK_R1_SECTIONS: PaperSection[] = [
+  {
+    id: 'sec_1',
+    name: 'Abstract',
+    heading: 'Abstract',
+    text: 'We introduce our first-generation reasoning models, DeepSeek-R1-Zero and DeepSeek-R1. DeepSeek-R1-Zero, a model trained via large-scale reinforcement learning (RL) without supervised fine-tuning (SFT) as a preliminary step, demonstrates remarkable reasoning capabilities. Through RL, DeepSeek-R1-Zero naturally emerges with numerous powerful and intriguing reasoning behaviors. However, it encounters challenges such as poor readability and language mixing. To address these issues and further enhance reasoning performance, we introduce DeepSeek-R1, which incorporates multi-stage training and cold-start data before RL.',
+    pageStart: 1,
+    pageEnd: 1,
+    charCount: 650,
+  },
+  {
+    id: 'sec_2',
+    name: 'Methodology & GRPO',
+    heading: '2 Approach: Group Relative Policy Optimization',
+    text: 'To alleviate the training overhead of traditional actor-critic algorithms like PPO, we adopt Group Relative Policy Optimization (GRPO). Instead of training a separate critic neural network to estimate state values, GRPO samples a group of candidate outputs {o_1, o_2, ..., o_G} for each question and computes relative advantages by comparing the reward of each output against the group baseline. We employ accuracy rewards verified by symbolic or test verifiers and format rewards requiring explicit thinking tags.',
+    pageStart: 2,
+    pageEnd: 6,
+    charCount: 620,
+  },
+];
+
+export const DEEPSEEK_R1_CHUNKS: PaperChunk[] = DEEPSEEK_R1_SECTIONS.map((sec, i) => ({
+  id: `chunk_${i + 1}`,
+  sectionName: sec.name,
+  heading: sec.heading,
+  pageNumber: sec.pageStart,
+  text: sec.text,
+  charCount: sec.charCount,
+  tokenEstimate: Math.round(sec.charCount / 4),
+}));
+
 export const LANDMARK_PAPERS: Record<string, PaperDetail> = {
   paper_transformer: {
     id: 'paper_transformer',
@@ -404,6 +510,26 @@ export const LANDMARK_PAPERS: Record<string, PaperDetail> = {
     ingestionSource: 'curated',
     createdAt: '2026-01-03T00:00:00.000Z',
     pdfUrl: 'https://arxiv.org/pdf/2205.14135.pdf',
+  },
+  paper_deepseek_r1: {
+    id: 'paper_deepseek_r1',
+    title: 'DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning',
+    authors: DEEPSEEK_R1_SUMMARY.authors,
+    publicationDate: '2025',
+    venueOrCategory: 'arXiv 2025 (cs.CL)',
+    arxivId: '2501.12948',
+    doi: '10.48550/arXiv.2501.12948',
+    abstract: DEEPSEEK_R1_SECTIONS[0].text,
+    totalPages: 24,
+    sections: DEEPSEEK_R1_SECTIONS,
+    chunks: DEEPSEEK_R1_CHUNKS,
+    summary: DEEPSEEK_R1_SUMMARY,
+    sectionCount: DEEPSEEK_R1_SECTIONS.length,
+    chunkCount: DEEPSEEK_R1_CHUNKS.length,
+    hasSummary: true,
+    ingestionSource: 'curated',
+    createdAt: '2026-01-04T00:00:00.000Z',
+    pdfUrl: 'https://arxiv.org/pdf/2501.12948.pdf',
   },
 };
 
