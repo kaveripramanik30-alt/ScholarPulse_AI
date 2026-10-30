@@ -31,9 +31,9 @@ The platform implements the complete 8-stage academic research intelligence pipe
 |     - FAISS (Facebook AI Similarity Search) dense L2 / Cosine similarity index                   |
 |                                                                                                  |
 |  5. MAP-REDUCE SUMMARIZATION                                                                     |
-|     - Map Phase: Section-level factual proposition compression                                  |
-|     - Reduce Phase: Google Gemini 3.8 Flash JSON schema-constrained synthesis                     |
-|       (Executive Summary, Contributions, Methodology, Empirical Benchmarks, Limitations)        |
+|     - Map Phase: Section-level factual proposition compression                                   |
+|     - Reduce Phase: Google Gemini 3.8 Flash JSON schema-constrained synthesis                    |
+|       (Executive Summary, Contributions, Methodology, Empirical Benchmarks, Limitations)         |
 |                                                                                                  |
 |  6. GROUNDED RAG Q&A                                                                             |
 |     - Hybrid Retrieval: Vector similarity + Section heading weighting                            |
