@@ -11,7 +11,7 @@ import { WorkspaceDrawer } from './components/WorkspaceDrawer';
 import { AuthModal } from './components/AuthModal';
 import { Loader2, AlertCircle, BookOpen, Sparkles, Plus } from 'lucide-react';
 import { auth, onAuthStateChanged, User } from './firebase';
-import { getPapersList, getPaperDetail, safeFetchJson } from './services/api';
+import { getPapersList, getPaperDetail, safeFetchJson, saveLocalPaper } from './services/api';
 import { LANDMARK_PAPERS, getLandmarkPaperList } from './data/landmarkPapers';
 
 export default function App() {
@@ -59,6 +59,33 @@ export default function App() {
     }
   };
 
+  const isFallbackOrGenericSummary = (paper: PaperDetail | null): boolean => {
+    if (!paper || !paper.summary) return false;
+    if (
+      paper.id.startsWith('paper_transformer') ||
+      paper.id.startsWith('paper_lora') ||
+      paper.id.startsWith('paper_flashattention') ||
+      paper.id.startsWith('paper_deepseek_r1')
+    ) {
+      return false;
+    }
+    const exec = paper.summary.executiveSummary || '';
+    const firstContrib = paper.summary.coreContributions?.[0] || '';
+    if (
+      exec.includes('Academic manuscript indexed from arXiv repository identifier') ||
+      exec.includes('investigates core architectural methodology and empirical evaluation within')
+    ) {
+      return true;
+    }
+    if (
+      firstContrib.includes('Systematic Paradigm: Formulates') ||
+      firstContrib.includes('Algorithmic Formulation: Systematic formulation')
+    ) {
+      return true;
+    }
+    return false;
+  };
+
   // Fetch paper details when currentPaperId changes
   const loadPaperDetail = async (id: string) => {
     // If already in landmark papers cache, set immediately without waiting
@@ -73,6 +100,13 @@ export default function App() {
       const paper = await getPaperDetail(id, currentUser);
       setCurrentPaper(paper);
       setErrorMessage(null);
+
+      // Auto-trigger Gemini synthesis if paper is currently sitting on fallback summary
+      if (isFallbackOrGenericSummary(paper) && !isSummarizing) {
+        setTimeout(() => {
+          handleRunSummarizeForPaper(paper);
+        }, 100);
+      }
     } catch (err: any) {
       console.warn('Paper detail resolution notice:', err);
       if (LANDMARK_PAPERS[id]) {
@@ -95,9 +129,9 @@ export default function App() {
     }
   }, [currentPaperId]);
 
-  // Summarize handler
-  const handleRunSummarize = async () => {
-    if (!currentPaper || isSummarizing) return;
+  // Summarize handler for specified paper
+  const handleRunSummarizeForPaper = async (paperToSummarize: PaperDetail) => {
+    if (isSummarizing) return;
     setIsSummarizing(true);
     setErrorMessage(null);
 
@@ -106,7 +140,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          paperId: currentPaper.id,
+          paperId: paperToSummarize.id,
           userId: currentUser?.uid,
           userEmail: currentUser?.email,
           force: true,
@@ -115,27 +149,33 @@ export default function App() {
 
       if (res.ok && res.data?.summary) {
         const summaryData = res.data.summary;
-        setCurrentPaper((prev) => (prev ? {
-          ...prev,
-          title: summaryData.title || prev.title,
-          authors: (summaryData.authors && summaryData.authors.length > 0 && summaryData.authors[0] !== 'Contributing Academic Researchers')
-            ? summaryData.authors
-            : prev.authors,
+        const updated: PaperDetail = {
+          ...paperToSummarize,
+          title: summaryData.title || paperToSummarize.title,
+          authors:
+            summaryData.authors && summaryData.authors.length > 0 && summaryData.authors[0] !== 'Contributing Academic Researchers'
+              ? summaryData.authors
+              : paperToSummarize.authors,
           summary: summaryData,
-        } : null));
+        };
+        setCurrentPaper(updated);
+        saveLocalPaper(updated);
         loadPapers();
       } else {
-        // Fallback: If paper already has summary (e.g. landmark), inform user
-        if (currentPaper.summary) {
-          // Already summarized
-        } else {
-          setErrorMessage(res.errorText || 'Summarization notice: Server synthesis busy.');
+        if (!paperToSummarize.summary) {
+          setErrorMessage(res.errorText || 'Summarization notice: Gemini synthesis busy.');
         }
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Summarization failed');
     } finally {
       setIsSummarizing(false);
+    }
+  };
+
+  const handleRunSummarize = () => {
+    if (currentPaper) {
+      handleRunSummarizeForPaper(currentPaper);
     }
   };
 

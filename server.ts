@@ -13,7 +13,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { Agent, setGlobalDispatcher } from 'undici';
 import { PDFParse } from 'pdf-parse';
 import { jsPDF } from 'jspdf';
@@ -1712,17 +1712,26 @@ app.post('/api/paper/upload', upload.single('file') as any, async (req: Request,
       createdAt: new Date().toISOString(),
     };
 
+    newPaper.summary = synthesizeFallbackSummary(newPaper);
     savePaper(newPaper);
+
+    try {
+      newPaper.summary = await generateAndAttachSummary(newPaper);
+      savePaper(newPaper);
+    } catch (sumErr) {
+      console.warn('PDF auto-summarization note:', sumErr);
+    }
 
     res.json({
       success: true,
       paperId,
       title: newPaper.title,
       authors: newPaper.authors,
-      totalPages,
+      totalPages: typeof totalPages === 'number' ? totalPages : 10,
       sectionsCount: extracted.sections.length,
       chunksCount: chunks.length,
-      message: 'PDF successfully ingested and structured.',
+      summary: newPaper.summary,
+      message: 'PDF successfully ingested and structured with Gemini synthesis.',
     });
   } catch (err: any) {
     console.error('PDF parsing error:', err);
@@ -1803,26 +1812,14 @@ app.post('/api/paper/arxiv', async (req: Request, res: Response) => {
       createdAt: new Date().toISOString(),
     };
 
-    // Seed with high-fidelity structural synthesis immediately
+    // Seed with high-fidelity structural synthesis immediately as safety baseline
     record.summary = synthesizeFallbackSummary(record);
     savePaper(record);
 
-    // Fast-path: attempt full Gemini 3.8 Flash synthesis if responsive within 3.8s, otherwise complete in background
+    // Deep synthesis with Gemini 3.8 Flash
     try {
-      const fastSummaryPromise = generateAndAttachSummary(record);
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3800));
-      const maybeSummary = await Promise.race([fastSummaryPromise, timeoutPromise]);
-      if (maybeSummary) {
-        record.summary = maybeSummary;
-        savePaper(record);
-      } else {
-        fastSummaryPromise
-          .then((deepSummary) => {
-            record.summary = deepSummary;
-            savePaper(record);
-          })
-          .catch((bgErr) => console.warn('Background summary generation notice:', bgErr));
-      }
+      record.summary = await generateAndAttachSummary(record);
+      savePaper(record);
     } catch (sumErr) {
       console.warn('Auto-summarization note during arXiv ingestion:', sumErr);
     }
@@ -1832,7 +1829,7 @@ app.post('/api/paper/arxiv', async (req: Request, res: Response) => {
       paperId,
       title: record.title,
       authors: record.authors,
-      totalPages,
+      totalPages: typeof totalPages === 'number' ? totalPages : 10,
       sectionsCount: extracted.sections.length,
       chunksCount: chunks.length,
       pdfUrl,
@@ -1912,7 +1909,15 @@ app.post('/api/paper/doi', async (req: Request, res: Response) => {
       createdAt: new Date().toISOString(),
     };
 
+    record.summary = synthesizeFallbackSummary(record);
     savePaper(record);
+
+    try {
+      record.summary = await generateAndAttachSummary(record);
+      savePaper(record);
+    } catch (sumErr) {
+      console.warn('DOI auto-summarization note:', sumErr);
+    }
 
     res.json({
       success: true,
@@ -1920,7 +1925,8 @@ app.post('/api/paper/doi', async (req: Request, res: Response) => {
       title,
       authors,
       doi: cleanDoi,
-      message: 'DOI resolved and indexed successfully.',
+      summary: record.summary,
+      message: 'DOI resolved, indexed, and summarized successfully.',
     });
   } catch (err: any) {
     console.error('DOI parse error:', err);
@@ -1944,11 +1950,8 @@ async function generateGeminiWithFallback(options: {
 
   const models = [
     'gemini-3.8-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-3.1-flash-lite',
     'gemini-flash-latest',
+    'gemini-3.1-flash-lite',
   ];
   const timeoutMs = options.perModelTimeoutMs || 30000;
 
@@ -1958,10 +1961,18 @@ async function generateGeminiWithFallback(options: {
     try {
       console.log(`[Gemini Engine] Attempting model: ${model} (timeout: ${timeoutMs}ms)...`);
 
+      const config: any = {};
+      if (options.responseMimeType) {
+        config.responseMimeType = options.responseMimeType;
+      }
+      if (model.includes('3.8-flash')) {
+        config.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
+      }
+
       const generationPromise = ai.models.generateContent({
         model,
         contents: options.contents,
-        config: options.responseMimeType ? { responseMimeType: options.responseMimeType } : undefined,
+        config: Object.keys(config).length > 0 ? config : undefined,
       });
 
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -2566,13 +2577,10 @@ async function startServer() {
   });
 }
 
-// Start listener only when executed directly (not when imported in Vercel serverless function)
-const isMainModule = !process.env.VERCEL && (
-  Boolean(process.argv[1]?.endsWith('server.ts') || process.argv[1]?.endsWith('server.js')) ||
-  process.env.npm_lifecycle_event === 'dev' ||
-  process.env.npm_lifecycle_event === 'start'
-);
-
-if (isMainModule) {
-  startServer();
+// Start listener unless running inside Vercel serverless environment
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('[ScholarPulse AI] Failed to start server:', err);
+  });
 }
+

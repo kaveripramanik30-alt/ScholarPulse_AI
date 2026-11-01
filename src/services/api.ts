@@ -152,6 +152,7 @@ export async function getPaperDetail(id: string, currentUser: User | null): Prom
 
     const res = await safeFetchJson<PaperDetail>(url);
     if (res.ok && res.data && res.data.title) {
+      saveLocalPaper(res.data);
       return res.data;
     }
   } catch (e) {
@@ -375,7 +376,7 @@ export async function ingestArxivPaper(
     return { success: true, paperId: 'paper_deepseek_r1', title: LANDMARK_PAPERS.paper_deepseek_r1.title };
   }
 
-  // 2. Try server endpoint first
+  // 2. Try server endpoint first (executes Gemini synthesis on the backend)
   try {
     const res = await safeFetchJson<{ paperId: string; title: string; summary?: any; error?: string }>('/api/paper/arxiv', {
       method: 'POST',
@@ -388,7 +389,18 @@ export async function ingestArxivPaper(
     });
 
     if (res.ok && res.data?.paperId) {
+      // Sync fresh paper detail to localStorage
+      try {
+        const detailRes = await safeFetchJson<PaperDetail>(`/api/papers/${res.data.paperId}`);
+        if (detailRes.ok && detailRes.data) {
+          saveLocalPaper(detailRes.data);
+        }
+      } catch (dErr) {
+        // non-blocking
+      }
       return { success: true, paperId: res.data.paperId, title: res.data.title || 'Academic Paper' };
+    } else if (res.data?.error) {
+      console.warn('[ScholarPulse] Server arXiv ingestion error:', res.data.error);
     }
   } catch (serverErr) {
     console.warn('[ScholarPulse] Server endpoint notice, proceeding to client-side arXiv open-access ingestion:', serverErr);
@@ -434,13 +446,13 @@ export async function ingestArxivPaper(
         category = `${cMatch[1]} (arXiv:${arxivId})`;
       }
 
-      if (title && title.toLowerCase() !== 'error') {
+      if (title && title.toLowerCase() !== 'error' && abstract && abstract.length > 30) {
         const paper = createClientSynthesizedPaper(
           arxivId,
           title,
-          authors,
+          authors.length > 0 ? authors : ['Contributing Academic Researchers'],
           abstract,
-          pubDate,
+          pubDate || new Date().getFullYear().toString(),
           category,
           currentUser?.uid || undefined,
           currentUser?.email || undefined
@@ -453,19 +465,7 @@ export async function ingestArxivPaper(
     console.warn('[ScholarPulse] Direct arXiv Atom API notice:', clientFetchErr);
   }
 
-  // 4. Guaranteed fallback paper for arbitrary valid arXiv IDs
-  const fallbackPaper = createClientSynthesizedPaper(
-    arxivId,
-    `arXiv:${arxivId} Research Paper`,
-    ['Contributing Academic Researchers'],
-    `Academic manuscript indexed from arXiv repository identifier ${arxivId}. Provides structure-aware sectioning and grounded RAG synthesis.`,
-    new Date().getFullYear().toString(),
-    `arXiv:${arxivId}`,
-    currentUser?.uid || undefined,
-    currentUser?.email || undefined
-  );
-  saveLocalPaper(fallbackPaper);
-  return { success: true, paperId: fallbackPaper.id, title: fallbackPaper.title };
+  throw new Error(`Unable to find or ingest paper with arXiv identifier "${arxivId}". Please verify that this paper exists on arXiv (e.g. 1706.03762, 2106.09685, 2205.14135, 2501.12948, 2610.35552).`);
 }
 
 /**
