@@ -406,10 +406,40 @@ export async function ingestArxivPaper(
     console.warn('[ScholarPulse] Server endpoint notice, proceeding to client-side arXiv open-access ingestion:', serverErr);
   }
 
-  // 3. Resilient client-side fallback: Query arXiv Open Access Atom API directly
+  // 3. Resilient fallback via /api/arxiv-proxy or CORS-safe endpoint
   try {
-    const arxivApiUrl = `https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxivId)}`;
-    const apiRes = await fetch(arxivApiUrl);
+    const proxyRes = await safeFetchJson<{ title?: string; authors?: string[]; abstract?: string; publicationDate?: string }>(
+      `/api/arxiv-proxy?id=${encodeURIComponent(arxivId)}`
+    );
+
+    if (proxyRes.ok && proxyRes.data) {
+      const data = proxyRes.data;
+      const title = data.title;
+      const abstract = data.abstract;
+      if (title && abstract) {
+        const paper = createClientSynthesizedPaper(
+          arxivId,
+          title,
+          data.authors && data.authors.length > 0 ? data.authors : ['Contributing Academic Researchers'],
+          abstract,
+          data.publicationDate || new Date().getFullYear().toString(),
+          `arXiv:${arxivId}`,
+          currentUser?.uid || undefined,
+          currentUser?.email || undefined
+        );
+        saveLocalPaper(paper);
+        return { success: true, paperId: paper.id, title: paper.title };
+      }
+    }
+  } catch (proxyErr) {
+    console.warn('[ScholarPulse] Internal arXiv proxy notice:', proxyErr);
+  }
+
+  // 4. Public CORS gateway fallback to arXiv Open Access API
+  try {
+    const targetUrl = `https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxivId)}`;
+    const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+    const apiRes = await fetch(corsProxyUrl);
     if (apiRes.ok) {
       const xml = await apiRes.text();
       const entryMatch = xml.match(/<entry>([\s\S]*?)<\/entry>/i);
@@ -462,10 +492,10 @@ export async function ingestArxivPaper(
       }
     }
   } catch (clientFetchErr) {
-    console.warn('[ScholarPulse] Direct arXiv Atom API notice:', clientFetchErr);
+    console.warn('[ScholarPulse] Public CORS arXiv gateway notice:', clientFetchErr);
   }
 
-  throw new Error(`Unable to find or ingest paper with arXiv identifier "${arxivId}". Please verify that this paper exists on arXiv (e.g. 1706.03762, 2106.09685, 2205.14135, 2501.12948, 2610.35552).`);
+  throw new Error(`Unable to find or ingest paper with arXiv identifier "${arxivId}". Please verify that this paper exists on arXiv (e.g. 1706.03762, 2106.09685, 2205.14135, 2501.12948, 2610.33222).`);
 }
 
 /**

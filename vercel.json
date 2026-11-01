@@ -10,7 +10,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api"
+      "destination": "/api?__subpath=$1"
     },
     {
       "source": "/((?!api/).*)",

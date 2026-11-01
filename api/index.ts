@@ -16,7 +16,13 @@ export default function handler(req: any, res: any) {
     const matchedPath = req.headers['x-matched-path'] || req.headers['x-now-route-matches'];
 
     // 1. Restore actual destination path if Vercel edge rewrite mapped to /api
-    if (typeof matchedPath === 'string' && matchedPath.startsWith('/api')) {
+    if (req.query && req.query.__subpath) {
+      const subpath = Array.isArray(req.query.__subpath) ? req.query.__subpath.join('/') : req.query.__subpath;
+      const urlObj = new URL(rawUrl, 'http://localhost');
+      urlObj.searchParams.delete('__subpath');
+      const search = urlObj.search;
+      req.url = `/api/${subpath}${search}`;
+    } else if (typeof matchedPath === 'string' && matchedPath.startsWith('/api')) {
       req.url = matchedPath;
     } else if (req.query && req.query['0']) {
       // Vercel regex capture /api/(.*) -> req.query['0']

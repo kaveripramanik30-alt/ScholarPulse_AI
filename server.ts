@@ -122,8 +122,20 @@ const upload = multer({
   limits: { fileSize: 35 * 1024 * 1024 },
 });
 
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+// Body parsing with safe bypass if already parsed by Vercel serverless environment
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    return next();
+  }
+  express.json({ limit: '25mb' })(req, res, next);
+});
+
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    return next();
+  }
+  express.urlencoded({ extended: true, limit: '25mb' })(req, res, next);
+});
 
 // Resilient URL normalization for Vercel serverless functions & edge rewrites
 app.use((req, res, next) => {
@@ -1739,6 +1751,30 @@ app.post('/api/paper/upload', upload.single('file') as any, async (req: Request,
   }
 });
 
+// 5.5 CORS-safe arXiv metadata proxy
+app.get('/api/arxiv-proxy', async (req: Request, res: Response) => {
+  try {
+    const rawId = (req.query.id as string || req.query.arxivId as string || '').trim();
+    if (!rawId) {
+      return res.status(400).json({ error: 'arXiv identifier is required.' });
+    }
+    const match = rawId.match(/(?:arxiv\.org\/(?:abs|pdf)\/|arxiv:)?([0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?|[a-z\-]+(?:\.[a-z]{2})?\/[0-9]{7})/i);
+    const arxivId = match ? match[1] : rawId;
+    const meta = await fetchArxivMetadata(arxivId);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.json({
+      success: true,
+      arxivId,
+      title: meta.title,
+      authors: meta.authors,
+      abstract: meta.abstract,
+      publicationDate: meta.pubDate,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: `arXiv proxy error: ${err.message}` });
+  }
+});
+
 // 6. Ingest via arXiv Link or ID
 app.post('/api/paper/arxiv', async (req: Request, res: Response) => {
   try {
@@ -1765,7 +1801,7 @@ app.post('/api/paper/arxiv', async (req: Request, res: Response) => {
     try {
       const pdfResp = await fetch(pdfUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ScholarPulse/1.0' },
-        signal: AbortSignal.timeout(3500),
+        signal: AbortSignal.timeout(1800),
       });
       if (pdfResp.ok) {
         const arrayBuf = await pdfResp.arrayBuffer();
@@ -1948,12 +1984,10 @@ async function generateGeminiWithFallback(options: {
     throw new Error('GEMINI_API_KEY environment variable is not configured.');
   }
 
-  const models = [
-    'gemini-3.8-flash',
-    'gemini-flash-latest',
-    'gemini-3.1-flash-lite',
-  ];
-  const timeoutMs = options.perModelTimeoutMs || 30000;
+  const models = process.env.VERCEL
+    ? ['gemini-3.1-flash-lite', 'gemini-3.8-flash']
+    : ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const timeoutMs = options.perModelTimeoutMs || (process.env.VERCEL ? 6500 : 30000);
 
   let lastError: any = null;
 
@@ -2216,7 +2250,7 @@ JSON Schema:
     const responseText = await generateGeminiWithFallback({
       contents: prompt,
       responseMimeType: 'application/json',
-      perModelTimeoutMs: 12000,
+      perModelTimeoutMs: process.env.VERCEL ? 5000 : 12000,
     });
 
     let parsed: any;
